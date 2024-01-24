@@ -35,9 +35,10 @@ def get_args():
         "--mlperf_conf", default="mlperf.conf", help="mlperf rules config")
     parser.add_argument("--user_conf", default="user.conf",
                         help="user config for user LoadGen settings such as target QPS")
-    parser.add_argument("--max_examples", type=int, default=13368,
+    parser.add_argument("--max_examples", type=int, default=None,
                         help="Maximum number of examples to consider (not limited by default)")
     parser.add_argument("--model_script_path", default="./quantization/model_script/Qlevel1_RGDA0-W8A16-PTQ.yaml", help="")
+    parser.add_argument("--use_mcp", action="store_true", help="use mcp to quantize the model")
     args = parser.parse_args()
     return args
 
@@ -62,7 +63,8 @@ def main():
         use_gpu=args.gpu,
     )
 
-    #quant_model = quantization.get_quant_model(sut.model, sut.data_object, args.model_script_path)
+    if args.use_mcp:
+        sut.model = quantization.get_quant_model(sut.model, sut.data_object, args.model_script_path)
     
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
@@ -85,7 +87,7 @@ def main():
     log_settings = lg.LogSettings()
     log_settings.log_output = log_output_settings
     log_settings.enable_trace = True
-
+ 
     lg.StartTestWithLogSettings(sut.sut, sut.qsl, settings, log_settings, args.audit_conf)
     print("Test Done!")
 

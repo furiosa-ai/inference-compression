@@ -31,7 +31,7 @@ def get_quant_model(model, data_object, model_script_path):
     #Load model script and calibration dataloader
     model_script = load_model_script(model_script_path)
     calib_dataloader = make_dataloader(data_object, model_script['calib_batch_size'])
-    
+    method_generate = model.generate
     model = symbolic_trace(model, input_names=["input_ids", "attention_mask"])
     
     quant_model = model_compressor.create_quantsim_model(
@@ -61,3 +61,9 @@ def get_quant_model(model, data_object, model_script_path):
         act_dtype=model_script["act_dtype"],
         act_nbits=model_script["act_nbits"],
     )
+    
+    quant_model.generate = method_generate
+    quant_model.recompile()
+    
+    
+    return quant_model
