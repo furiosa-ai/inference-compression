@@ -8,6 +8,7 @@ from transformers.generation.logits_process import LogitsProcessorList
 from transformers.modeling_utils import PreTrainedModel
 from transformers.generation.streamers import BaseStreamer
 from transformers.generation.stopping_criteria import StoppingCriteriaList
+from types import SimpleNamespace
 
 GreedySearchOutput = Union[GreedySearchEncoderDecoderOutput, GreedySearchDecoderOnlyOutput]
 SampleOutput = Union[SampleEncoderDecoderOutput, SampleDecoderOnlyOutput]
@@ -16,13 +17,25 @@ BeamSampleOutput = Union[BeamSampleEncoderDecoderOutput, BeamSampleDecoderOnlyOu
 ContrastiveSearchOutput = Union[ContrastiveSearchEncoderDecoderOutput, ContrastiveSearchDecoderOnlyOutput]
 GenerateOutput = Union[GreedySearchOutput, SampleOutput, BeamSearchOutput, BeamSampleOutput, ContrastiveSearchOutput]
 
-class QuantPreTrainedModel(PreTrainedModel):
-    def __init__(self, quant_model, config, model_type):
-        self.model_type = model_type
-        super().__init__(config)
-        self.quant_model = quant_model
-        self.config = config
+@dataclass
+class LLMOutput(ModelOutput):
+    loss: Optional[torch.FloatTensor] = None
+    logits: torch.FloatTensor = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
+    attentions: Optional[Tuple[torch.FloatTensor]] = None
     
+
+
+class QuantPreTrainedModel(PreTrainedModel):
+    def __init__(self, quant_model, model_type, input_names, concrete_args):
+        self.model_type = model_type
+        super().__init__(quant_model.config)
+        self.quant_model = quant_model
+        self.config = quant_model.config
+        self.input_names = input_names
+        self.concrete_args = concrete_args 
+        
     def can_generate(self):
         return self.model_type.can_generate()
     
@@ -52,7 +65,24 @@ class QuantPreTrainedModel(PreTrainedModel):
     def prepare_inputs_for_generation(self, input_ids, **model_kwargs):
         return self.model_type.prepare_inputs_for_generation(self, input_ids, **model_kwargs)
     
+    def _reorder_cache(self, 
+        past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
+    ) -> Tuple[Tuple[torch.Tensor]]:
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PretrainedModel.beam_search`] or
+        [`~PretrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        return self.model_type._reorder_cache(past_key_values, beam_idx)
+    
     def __call__(self, **kwargs):
-        return self.quant_model(**kwargs)
+        items_to_delete = []
+        for item in kwargs.keys():
+            if item in self.concrete_args:
+                items_to_delete.append(item)
+        
+        updated_kwargs = {key: value for key, value in kwargs.items() if key not in items_to_delete}
+  
+        return LLMOutput(self.quant_model(**updated_kwargs))
     
    
