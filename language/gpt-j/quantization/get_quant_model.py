@@ -6,6 +6,7 @@ from transformers.utils.fx import symbolic_trace
 import model_compressor
 from typing import Optional
 from .QuantGenerationModel import QuantPreTrainedModel
+from .custom_symbolic_trace import custom_symbolic_trace
 
 
 gen_kwargs = {
@@ -39,12 +40,12 @@ def get_quant_model(model, data_object, model_script_path):
     calib_dataloader = make_dataloader(data_object, model_script['calib_batch_size'])
     
     #Extract necessary parameters to initialize QuantPreTrainedModel
-    model_config = model.config
     model_type = type(model)
 
 
-    model = symbolic_trace(model, input_names=["input_ids", "position_ids","attention_mask"])
-
+    
+    model, input_names, concrete_args = custom_symbolic_trace(model)
+    
     quant_model = model_compressor.create_quantsim_model(
         model,
         weight_calib_method=model_script["weight_calib_method"],
@@ -97,5 +98,5 @@ def get_quant_model(model, data_object, model_script_path):
     quant_model.recompile()
     
     
-    return QuantPreTrainedModel(quant_model, model_config, model_type)
+    return QuantPreTrainedModel(quant_model, model_type, input_names, concrete_args)
  
