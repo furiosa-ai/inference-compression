@@ -3,4 +3,4 @@ outs:
   size: 543976536
   nfiles: 1
   hash: md5
-  path: model
+  path: rnnt
