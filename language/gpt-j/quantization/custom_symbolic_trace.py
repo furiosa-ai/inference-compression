@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 def get_input_names_and_concrete_args(model: PreTrainedModel):
     if type(model)==GPTJForCausalLM:
-        custom_concrete_args = {'use_cache' : False, 'return_dict' : True} 
+        custom_concrete_args = {'use_cache' : False, 'return_dict' : True, 'output_attentions': False, 'output_hidden_states': False} 
         input_names = ["input_ids", "position_ids", "attention_mask"]
     else:    
         raise NotImplementedError
