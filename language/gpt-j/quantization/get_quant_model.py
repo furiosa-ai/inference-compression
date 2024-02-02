@@ -45,8 +45,7 @@ def get_quant_model(model, data_object, model_script_path):
 
     
     model, input_names, concrete_args = custom_symbolic_trace(model)
-    
-    quant_model = model_compressor.create_quantsim_model(
+    model = model_compressor.create_quantsim_model(
         model,
         weight_calib_method=model_script["weight_calib_method"],
         weight_granularity=model_script["weight_granularity"],
@@ -80,23 +79,21 @@ def get_quant_model(model, data_object, model_script_path):
     #         data_preprocessor=explicit_preproc_fn,
     # )
 
-    # model_compressor.save_qformat(
-    #     model,
-    #     qformat_out_path="./qformat.yaml",
-    #     weight_calib_method=model_script["weight_calib_method"],
-    #     weight_granularity=model_script["weight_granularity"],
-    #     weight_dtype=model_script["weight_dtype"],
-    #     weight_nbits=model_script["weight_nbits"],
-    #     act_calib_method=model_script["act_calib_method"],
-    #     act_granularity=model_script["act_granularity"],
-    #     act_dtype=model_script["act_dtype"],
-    #     act_nbits=model_script["act_nbits"],
-    # )
+    model_compressor.save_qformat(
+        model,
+        qformat_out_path="./qformat.yaml",
+        weight_calib_method=model_script["weight_calib_method"],
+        weight_granularity=model_script["weight_granularity"],
+        weight_dtype=model_script["weight_dtype"],
+        weight_nbits=model_script["weight_nbits"],
+        act_calib_method=model_script["act_calib_method"],
+        act_granularity=model_script["act_granularity"],
+        act_dtype=model_script["act_dtype"],
+        act_nbits=model_script["act_nbits"],
+    )
     
     
+    model.recompile()
     
-    quant_model.recompile()
-    
-    
-    return QuantPreTrainedModel(quant_model, model_type, input_names, concrete_args)
+    return QuantPreTrainedModel(model, model_type, input_names, concrete_args)
  
