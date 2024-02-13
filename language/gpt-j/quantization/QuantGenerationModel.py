@@ -77,9 +77,12 @@ class QuantPreTrainedModel(PreTrainedModel):
     
     def __call__(self, **kwargs):
         items_to_delete = []
-        for item in kwargs.keys():
-            if item in self.concrete_args:
-                items_to_delete.append(item)
+         
+        for key, value in kwargs.items():
+            if key in self.concrete_args:
+                if not value == self.concrete_args[key]:
+                    raise ValueError(f"The custom tracer set {key} as {self.concrete_args[key]} but kwargs sets {key} as {value}. Please check the argument again")
+                items_to_delete.append(key)
         
         updated_kwargs = {key: value for key, value in kwargs.items() if key not in items_to_delete}
   
