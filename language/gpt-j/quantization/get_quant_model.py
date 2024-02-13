@@ -52,24 +52,13 @@ def get_dummy_kv_cache(input_ids, model_config):
     return list(kv_cache)
 
 
-# def get_position_ids(num_tokens, device):
-
-#     position_ids = torch.zeros((gen_kwargs["num_beams"], num_tokens))
-#     for idx in range(len(position_ids)):
-#         position_ids[idx]=torch.arange(num_tokens)
-#     position_ids.to(device)
-
-#     return position_ids
-
-
 def get_quant_model(model, data_object, model_script_path):
     # Load model script and calibration dataloader
     model_script = load_model_script(model_script_path)
 
     calib_dataloader = make_dataloader(
         data_object, model_script['calib_batch_size'], model.config, model.config.use_cache, gen_mode=False)
-    # model.generate(**calib_dataloader[0],**gen_kwargs)
-    # model(**calib_dataloader_forward[0])
+
     # Extract necessary parameters to initialize QuantPreTrainedModel
     model_type = type(model)
 
