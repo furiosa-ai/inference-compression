@@ -17,8 +17,8 @@ gen_kwargs = {
     "num_beams": int(os.environ.get("GPTJ_BEAM_SIZE", "4")),
 }
 
-
-def make_dataloader(data_object, batch_size, model_config, use_cache=False, gen_mode=False):
+##To Do: the above function will be fixed later for calibration. 
+def make_dummy_dataloader(data_object, batch_size, model_config, use_cache=False, gen_mode=False): 
     data_list = []
     for idx in range(len(data_object.source_encoded_input_ids)):
         if use_cache == False and gen_mode == False:
@@ -56,7 +56,7 @@ def get_quant_model(model, data_object, model_script_path):
     # Load model script and calibration dataloader
     model_script = load_model_script(model_script_path)
 
-    calib_dataloader = make_dataloader(
+    calib_dataloader = make_dummy_dataloader(
         data_object, model_script['calib_batch_size'], model.config, model.config.use_cache, gen_mode=False)
 
     # Extract necessary parameters to initialize QuantPreTrainedModel
