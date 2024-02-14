@@ -79,13 +79,16 @@ class QuantPreTrainedModel(PreTrainedModel):
         items_to_delete = []
          
         for key, value in kwargs.items():
-            if key in self.concrete_args:
+            if key in self.concrete_args: #check if the concrete args used when tracing and the elements of kwargs are equal 
                 if not value == self.concrete_args[key]:
                     raise ValueError(f"The custom tracer set {key} as {self.concrete_args[key]} but kwargs sets {key} as {value}. Please check the argument again")
                 items_to_delete.append(key)
         
         updated_kwargs = {key: value for key, value in kwargs.items() if key not in items_to_delete}
-  
+
+        if "past_key_values" not in updated_kwargs.keys() or updated_kwargs["past_key_values"] == None: #add dummy past_key_valeus
+            updated_kwargs["past_key_values"] = tuple([None] * self.config.n_layer)
+        
         return LLMOutput(self.quant_model(**updated_kwargs))
     
    
