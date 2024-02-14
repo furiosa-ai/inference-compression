@@ -87,7 +87,7 @@ class QuantPreTrainedModel(PreTrainedModel):
         updated_kwargs = {key: value for key, value in kwargs.items() if key not in items_to_delete}
 
         if "past_key_values" not in updated_kwargs.keys() or updated_kwargs["past_key_values"] == None: #add dummy past_key_valeus
-            updated_kwargs["past_key_values"] = tuple([None] * self.config.n_layer)
+            updated_kwargs["past_key_values"] = tuple([[None, None]] * self.config.n_layer)
         
         return LLMOutput(self.quant_model(**updated_kwargs))
     
