@@ -8,6 +8,7 @@ import sys
 from backend import get_SUT
 import quantization 
 
+
 sys.path.insert(0, os.getcwd())
 
 
@@ -20,6 +21,8 @@ def get_args():
     parser.add_argument("--model-path", default="EleutherAI/gpt-j-6B", help="")
     parser.add_argument(
         "--dataset-path", default="./data/cnn_eval.json", help="")
+    parser.add_argument(
+        "--calib-dataset-path", default="./data/cnn_dailymail_calibration.json", help="")
     parser.add_argument("--accuracy", action="store_true",
                         help="enable accuracy pass")
     parser.add_argument("--dtype", default="float32", help="data type of the model, choose from float16, bfloat16 and float32")
@@ -64,7 +67,7 @@ def main():
     )
 
     if args.use_mcp:
-        sut.model = quantization.get_quant_model(sut.model, sut.data_object, args.model_script_path)
+        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path)
     
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]

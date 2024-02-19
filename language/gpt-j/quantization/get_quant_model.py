@@ -7,6 +7,7 @@ import model_compressor
 from typing import Optional
 from .QuantGenerationModel import QuantPreTrainedModel
 from .custom_symbolic_trace import custom_symbolic_trace
+from dataset import Dataset
 
 
 gen_kwargs = {
@@ -35,6 +36,15 @@ def make_dummy_dataloader(data_object, batch_size, model_config, use_cache=False
                 "Not implemented yet. Will implement when need arises.")
     return DataLoader(data_list, batch_size)
 
+def make_calib_dataloader(calib_dataset_path, batch_size, num_layer):
+    data_object = Dataset(calib_dataset_path, batch_size)
+    data_list = []
+    for idx in range(len(data_object.source_encoded_input_ids)):
+        data_list.append({'input_ids': data_object.source_encoded_input_ids[idx], 'attention_mask': data_object.source_encoded_attn_masks[idx], 'position_ids': torch.arange(
+                len(data_object.source_encoded_input_ids[idx][0]))})
+    return DataLoader(data_list, batch_size)
+
+
 
 def load_model_script(model_script_path):
     with open(model_script_path, 'r') as f:
@@ -52,12 +62,12 @@ def get_dummy_kv_cache(input_ids, model_config):
     return list(kv_cache)
 
 
-def get_quant_model(model, data_object, model_script_path):
+def get_quant_model(model, calib_dataset_path, model_script_path):
     # Load model script and calibration dataloader
     model_script = load_model_script(model_script_path)
-
-    calib_dataloader = make_dummy_dataloader(
-        data_object, model_script['calib_batch_size'], model.config, model.config.use_cache, gen_mode=False)
+    calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
+    # calib_dataloader = make_dummy_dataloader(
+    #     data_object, model_script['calib_batch_size'], model.config, model.config.use_cache, gen_mode=False)
 
     # Extract necessary parameters to initialize QuantPreTrainedModel
     model_type = type(model)
