@@ -88,37 +88,40 @@ def get_quant_model(model, calib_dataset_path, model_script_path):
         dataloader=calib_dataloader,
     )
 
-    # model_compressor.calibrate(
-    #         model=model,
-    #         #model_name=model_name,
-    #         weight_calib_method=model_script["weight_calib_method"],
-    #         act_calib_method=model_script["act_calib_method"],
-    #         outlier_calib_cfg=model_script['outlier_compensation'],
-    #         group_size=args.group_size,
-    #         percentile=args.percentile,
-    #         is_dynamic_quant=args.is_dynamic_quant,
-    #         split_mode=args.split_mode,
-    #         autoscale=args.autoscale,
-    #         autoscale_calib_method=args.autoscale_calib_method,
-    #         autoscale_calib_kwargs=calib_cfg['autoscale'],
-    #         autoclip=args.autoclip,
-    #         target_machine=args.target_machine,
-    #         calib_dataloader=loader_calib,
-    #         data_preprocessor=explicit_preproc_fn,
-    # )
-
-    model_compressor.save_qformat(
-        model,
-        qformat_out_path="./qformat.yaml",
-        weight_calib_method=model_script["weight_calib_method"],
-        weight_granularity=model_script["weight_granularity"],
-        weight_dtype=model_script["weight_dtype"],
-        weight_nbits=model_script["weight_nbits"],
-        act_calib_method=model_script["act_calib_method"],
-        act_granularity=model_script["act_granularity"],
-        act_dtype=model_script["act_dtype"],
-        act_nbits=model_script["act_nbits"],
+    model_compressor.calibrate(
+            model=model,
+            model_name=model_script["model"],
+            weight_calib_method=model_script["weight_calib_method"],
+            act_calib_method=model_script["act_calib_method"],
+            # outlier_calib_cfg=model_script['outlier_compensation'],
+            # group_size=args.group_size,
+            percentile=model_script["percentile"],
+            # split_mode=args.split_mode,
+            # autoscale=args.autoscale,
+            # autoscale_calib_method=args.autoscale_calib_method,
+            # autoscale_calib_kwargs=calib_cfg['autoscale'],
+            # autoclip=args.autoclip,
+            target_machine=model_script["target_machine"],
+            calib_dataloader=calib_dataloader,
+            # data_preprocessor=explicit_preproc_fn,
     )
+
+
+    model_compressor.save(
+            model,
+            qparam_out_path=f"./qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy",
+            qformat_out_path=f"./qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml",
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
+            #disable_mods=args.disable_quant_list,
+        )
+
 
     model.recompile()
 
