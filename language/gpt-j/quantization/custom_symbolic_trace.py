@@ -28,12 +28,7 @@ def get_input_names_and_concrete_args(model: PreTrainedModel):
     return input_names, concrete_args
 
 
-def custom_symbolic_trace(model: PreTrainedModel,
-                          input_names: Optional[List[str]] = None,
-                          custom_concrete_args: Dict = None,
-                          disable_check: bool = False,
-                          tracer_cls: Type[HFTracer] = HFTracer,
-                          ) -> GraphModule:
+def custom_symbolic_trace(model: PreTrainedModel, disable_check: bool = False) -> GraphModule:
 
     input_names, concrete_args = get_input_names_and_concrete_args(model)
 
@@ -41,7 +36,7 @@ def custom_symbolic_trace(model: PreTrainedModel,
         check_if_model_is_supported(model)
 
     # Tracing.
-    tracer = tracer_cls()
+    tracer = HFTracer()
     traced_graph = tracer.trace(model, concrete_args=concrete_args)
     traced = torch.fx.GraphModule(model, traced_graph)
 
