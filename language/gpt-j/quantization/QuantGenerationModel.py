@@ -1,30 +1,11 @@
-from transformers.generation.utils import GenerationMixin
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
 import torch
-from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
-from transformers.generation.utils import *
-from transformers.generation.configuration_utils import GenerationConfig
-from transformers.generation.logits_process import LogitsProcessorList
 from transformers.modeling_utils import PreTrainedModel
-from transformers.generation.streamers import BaseStreamer
-from transformers.generation.stopping_criteria import StoppingCriteriaList
-from types import SimpleNamespace
+from transformers.modeling_outputs import CausalLMOutputWithPast
+from transformers.generation.utils import inspect
 
-GreedySearchOutput = Union[GreedySearchEncoderDecoderOutput, GreedySearchDecoderOnlyOutput]
-SampleOutput = Union[SampleEncoderDecoderOutput, SampleDecoderOnlyOutput]
-BeamSearchOutput = Union[BeamSearchEncoderDecoderOutput, BeamSearchDecoderOnlyOutput]
-BeamSampleOutput = Union[BeamSampleEncoderDecoderOutput, BeamSampleDecoderOnlyOutput]
-ContrastiveSearchOutput = Union[ContrastiveSearchEncoderDecoderOutput, ContrastiveSearchDecoderOnlyOutput]
-GenerateOutput = Union[GreedySearchOutput, SampleOutput, BeamSearchOutput, BeamSampleOutput, ContrastiveSearchOutput]
 
-@dataclass
-class LLMOutput(ModelOutput):
-    loss: Optional[torch.FloatTensor] = None
-    logits: torch.FloatTensor = None
-    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
-    
 
 
 class QuantPreTrainedModel(PreTrainedModel):
@@ -89,6 +70,6 @@ class QuantPreTrainedModel(PreTrainedModel):
         if "past_key_values" not in updated_kwargs.keys() or updated_kwargs["past_key_values"] == None: #add dummy past_key_valeus
             updated_kwargs["past_key_values"] = tuple([[None, None]] * self.config.n_layer)
         
-        return LLMOutput(self.quant_model(**updated_kwargs))
+        return CausalLMOutputWithPast(self.quant_model(**updated_kwargs))
     
    
