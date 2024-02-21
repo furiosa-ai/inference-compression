@@ -63,7 +63,7 @@ def get_dummy_kv_cache(input_ids, model_config):
 
 
 def get_quant_model(model, calib_dataset_path, model_script_path):
-    # Load model script and calibration dataloader
+    # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
     calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
     # calib_dataloader = make_dummy_dataloader(
