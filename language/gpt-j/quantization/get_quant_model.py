@@ -62,19 +62,42 @@ def get_dummy_kv_cache(input_ids, model_config):
     return list(kv_cache)
 
 
+
+
 def get_quant_model(model, calib_dataset_path, model_script_path):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
-    calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
     # calib_dataloader = make_dummy_dataloader(
     #     data_object, model_script['calib_batch_size'], model.config, model.config.use_cache, gen_mode=False)
 
+    #set qformat & qparam_path
+
+    
+    qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
+    qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
+
+    if os.path.exists(qformat_path) and os.path.exists(qparam_path):
+        calib_dataloader = None
+        org_model = None
+    else:
+        calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
+        org_model = model if model_script["qlevel"]>=3 else None
+
+    
+
+        
     # Extract necessary parameters to initialize QuantPreTrainedModel
+    
+
     model_type = type(model)
 
     model, input_names, concrete_args = custom_symbolic_trace(model)
+
+    
     model = model_compressor.create_quantsim_model(
         model,
+        qformat_path = qformat_path if calib_dataloader is None else None,
+        qparam_path = qparam_path if calib_dataloader is None else None,
         weight_calib_method=model_script["weight_calib_method"],
         weight_granularity=model_script["weight_granularity"],
         weight_dtype=model_script["weight_dtype"],
@@ -86,31 +109,52 @@ def get_quant_model(model, calib_dataset_path, model_script_path):
         qlevel=model_script["qlevel"],
         target_machine=model_script["target_machine"],
         dataloader=calib_dataloader,
+        disable_inout=(True, True)
     )
 
-    model_compressor.calibrate(
-            model=model,
-            model_name=model_script["model"],
-            weight_calib_method=model_script["weight_calib_method"],
-            act_calib_method=model_script["act_calib_method"],
-            # outlier_calib_cfg=model_script['outlier_compensation'],
-            # group_size=args.group_size,
-            percentile=model_script["percentile"],
-            # split_mode=args.split_mode,
-            # autoscale=args.autoscale,
-            # autoscale_calib_method=args.autoscale_calib_method,
-            # autoscale_calib_kwargs=calib_cfg['autoscale'],
-            # autoclip=args.autoclip,
-            target_machine=model_script["target_machine"],
-            calib_dataloader=calib_dataloader,
-            # data_preprocessor=explicit_preproc_fn,
-    )
+    if calib_dataloader:
+        model_compressor.calibrate(
+                model=model,
+                model_name=model_script["model"],
+                weight_calib_method=model_script["weight_calib_method"],
+                act_calib_method=model_script["act_calib_method"],
+                # outlier_calib_cfg=model_script['outlier_compensation'],
+                # group_size=args.group_size,
+                percentile=model_script["percentile"],
+                # split_mode=args.split_mode,
+                # autoscale=args.autoscale,
+                # autoscale_calib_method=args.autoscale_calib_method,
+                # autoscale_calib_kwargs=calib_cfg['autoscale'],
+                # autoclip=args.autoclip,
+                target_machine=model_script["target_machine"],
+                calib_dataloader=calib_dataloader,
+                # data_preprocessor=explicit_preproc_fn,
+        )
+
+        model_compressor.save(
+                model,
+                qparam_out_path=qparam_path,
+                qformat_out_path=qformat_path,
+                weight_calib_method=model_script["weight_calib_method"],
+                weight_granularity=model_script["weight_granularity"],
+                weight_dtype=model_script["weight_dtype"],
+                weight_nbits=model_script["weight_nbits"],
+                act_calib_method=model_script["act_calib_method"],
+                act_granularity=model_script["act_granularity"],
+                act_dtype=model_script["act_dtype"],
+                act_nbits=model_script["act_nbits"],
+                #disable_mods=args.disable_quant_list,
+            )
 
 
-    model_compressor.save(
-            model,
-            qparam_out_path=f"./qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy",
-            qformat_out_path=f"./qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml",
+        model.recompile()
+
+
+    if org_model:
+        model = model_compressor.create_quantsim_model(
+            org_model,
+            qformat_path = qformat_path,
+            qparam_path = qparam_path,
             weight_calib_method=model_script["weight_calib_method"],
             weight_granularity=model_script["weight_granularity"],
             weight_dtype=model_script["weight_dtype"],
@@ -119,10 +163,9 @@ def get_quant_model(model, calib_dataset_path, model_script_path):
             act_granularity=model_script["act_granularity"],
             act_dtype=model_script["act_dtype"],
             act_nbits=model_script["act_nbits"],
-            #disable_mods=args.disable_quant_list,
+            qlevel=model_script["qlevel"],
+            target_machine=model_script["target_machine"],
+            dataloader=None,
         )
-
-
-    model.recompile()
 
     return QuantPreTrainedModel(model, model_type, input_names, concrete_args)
