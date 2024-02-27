@@ -24,6 +24,7 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, os.path.join(os.getcwd(), "..", "..", "lon"))
 from absl import app
 from absl import flags
+from quantization import get_quant_model
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -50,7 +51,16 @@ def get_args():
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--sut_server', nargs="*", default= ['http://localhost:8000'],
                     help='Address of the server(s) under test.')
-
+    #######################
+    parser.add_argument("--model_compressor", action="store_true",
+                    help="use quantized model W/ furiosa-model-compressor")
+    parser.add_argument("--calib_source", choices=["features","qas_ids"], default="features",
+                    )
+    parser.add_argument("--quant_config", type=str,  default="")
+    parser.add_argument("--qparam_path", type=str,  default='./qparam.npy')
+    parser.add_argument("--qformat_path", type=str,  default='./qformat.yaml')
+    parser.add_argument("--n_calib", type=int,  default=-1)
+    #######################
     args = parser.parse_args()
     return args
 
@@ -93,7 +103,14 @@ def main():
             sut = get_ray_sut(args)
         else:
             raise ValueError("Unknown backend: {:}".format(args.backend))
-
+    
+    #######################
+    # Get a quant model 
+    if args.model_compressor:
+        quant_model = get_quant_model(sut,args.quant_config, args.calib_source,args.qformat_path, args.qparam_path, args.n_calib)
+        sut.model = quant_model
+    #######################
+        
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
     settings.FromConfig(args.mlperf_conf, "bert", args.scenario)
