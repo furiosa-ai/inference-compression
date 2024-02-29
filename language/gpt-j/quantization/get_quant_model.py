@@ -8,6 +8,7 @@ from typing import Optional
 from .QuantGenerationModel import QuantPreTrainedModel
 from .custom_symbolic_trace import custom_symbolic_trace
 from dataset import Dataset
+import copy
 
 
 gen_kwargs = {
@@ -79,7 +80,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         org_model = None
     else:
         calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
-        org_model = model if model_script["qlevel"]>=3 else None
+        org_model = copy.deepcopy(model) if model_script["qlevel"]>=3 else None
 
     
 
@@ -144,7 +145,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
     if org_model:
         model = model_compressor.create_quantsim_model(
-            model,
+            org_model,
             qformat_path = qformat_path,
             qparam_path = qparam_path,
             weight_calib_method=model_script["weight_calib_method"],
