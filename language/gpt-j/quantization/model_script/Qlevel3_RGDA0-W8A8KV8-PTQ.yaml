@@ -1,0 +1,16 @@
+act_calib_method: MINMAX_ASYM
+act_dtype: int8
+act_granularity: channel
+act_nbits: 8
+batch_size: 1
+calib_batch_size: 1
+model: gpt-j
+model_overwrite: true
+percentile: 99.9
+target_machine: RGDA0
+weight_calib_method: AMAX_SYM
+weight_dtype: int8
+weight_granularity: channel
+weight_nbits: 8
+qlevel: 3
+kv_dtype: int8
