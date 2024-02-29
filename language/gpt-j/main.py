@@ -2,8 +2,6 @@ import subprocess
 import mlperf_loadgen as lg
 import argparse
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]= "3"
-
 import sys
 from backend import get_SUT
 import quantization 
@@ -42,6 +40,7 @@ def get_args():
                         help="Maximum number of examples to consider (not limited by default)")
     parser.add_argument("--model_script_path", default="./quantization/model_script/Qlevel1_RGDA0-W8A16-PTQ.yaml", help="")
     parser.add_argument("--use_mcp", action="store_true", help="use mcp to quantize the model")
+    parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     args = parser.parse_args()
     return args
 
@@ -67,7 +66,7 @@ def main():
     )
 
     if args.use_mcp:
-        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path)
+        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.recalibrate)
     
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
@@ -80,6 +79,7 @@ def main():
     else:
         settings.mode = lg.TestMode.PerformanceOnly
     log_path = os.environ.get("LOG_PATH")
+    log_path = f"build/logs/{args.dataset_path.split('.')[1].split('/')[-1]}"
     if not log_path:
         log_path = "build/logs"
     if not os.path.exists(log_path):

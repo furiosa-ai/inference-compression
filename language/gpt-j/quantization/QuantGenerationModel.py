@@ -73,3 +73,5 @@ class QuantPreTrainedModel(PreTrainedModel):
         return CausalLMOutputWithPast(self.quant_model(**updated_kwargs))
     
    
+
+
