@@ -16,44 +16,34 @@ class MyCollate:
             'token_type_ids': token_type_ids
         }
 
-def make_dataloader(qsl, batch_size, calib_data_source, n_calib=-1):
+def make_dataloader(qsl, batch_size, n_calib):
 
-    if calib_data_source == 'features':
-        file_path = os.path.join(
-            os.path.realpath(__file__)[0:os.path.realpath(__file__).find('language')], 
-            'calibration', 
-            'SQuAD-v1.1',
-            'bert_calibration_features.txt',)
-        with open(file_path, 'r') as fp:
-            lines = fp.readlines()
+    file_path = os.path.join(
+        os.path.realpath(__file__)[0:os.path.realpath(__file__).find('language')], 
+        'calibration', 
+        'SQuAD-v1.1',
+        'bert_calibration_features.txt',)
+    with open(file_path, 'r') as fp:
+        lines = fp.readlines()
 
-        calib_data_indice_list = []
-        for line in lines:
-            numbers = [int(num) for num in line.split('\n') if num.isdigit()]
-            calib_data_indice_list.extend(numbers)
-        
-        calib_eval_features = [qsl.eval_features[i] for i in calib_data_indice_list]
+    calib_data_indice_list = []
+    for line in lines:
+        numbers = [int(num) for num in line.split('\n') if num.isdigit()]
+        calib_data_indice_list.extend(numbers)
+    
+    calib_eval_features = [qsl.eval_features[i] for i in calib_data_indice_list]
 
-        data_list = []
-        if n_calib != -1:
-            calib_eval_features = calib_eval_features[0:n_calib]
-        for feature in calib_eval_features:
-            data_list.append({
-                'input_ids': torch.LongTensor(feature.input_ids),
-                'attention_mask': torch.LongTensor(feature.input_mask),
-                'token_type_ids': torch.LongTensor(feature.segment_ids),
-            })
-        
-        collate_fn = MyCollate()
-        dataloader = DataLoader(data_list, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-    elif calib_data_source == "qas_ids":
-        file_path = os.path.join(
-            os.path.realpath(__file__)[0:os.path.realpath(__file__).find('language')], 
-            'calibration', 
-            'SQuAD-v1.1',
-            'bert_calibration_qas_ids.txt',)
-        with open(file_path, 'r') as fp:
-            lines = fp.readlines()
-
+    data_list = []
+    if n_calib != -1:
+        calib_eval_features = calib_eval_features[0:n_calib]
+    for feature in calib_eval_features:
+        data_list.append({
+            'input_ids': torch.LongTensor(feature.input_ids),
+            'attention_mask': torch.LongTensor(feature.input_mask),
+            'token_type_ids': torch.LongTensor(feature.segment_ids),
+        })
+    
+    collate_fn = MyCollate()
+    dataloader = DataLoader(data_list, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
 
     return dataloader
