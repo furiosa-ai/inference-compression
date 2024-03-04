@@ -16,24 +16,30 @@ def load_model_script(model_script_path):
     return model_script
 
 
-def get_quant_model(sut, model_script_path, calib_source, qformat_path=None, qparam_path=None, n_calib=-1):
+def get_quant_model(sut, model_script_path, n_calib, recalibrate):
     #Load model script and calibration dataloader
-    
     model_script = load_model_script(model_script_path)
-    
     qlevel = model_script["qlevel"]
+
+    output_path='./quantization/output'
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    qformat_path = f"{output_path}/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
+    qparam_path = f"{output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
 
     model, input_names, concrete_args = custom_symbolic_trace(sut.model)
 
-    if os.path.exists(qformat_path) and os.path.exists(qparam_path):
+    if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
         org_model = None
     else:
-        calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], calib_source,n_calib)
+        calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib)
         import copy
         org_model = copy.deepcopy(model) if qlevel >=3 else None
 
-    #origin_model = model
+    model.config.use_cache = False
+
     quant_model = model_compressor.create_quantsim_model(
         model,
         qformat_path = qformat_path if calib_dataloader is None else None,
@@ -46,6 +52,7 @@ def get_quant_model(sut, model_script_path, calib_source, qformat_path=None, qpa
         act_granularity=model_script["act_granularity"],
         act_dtype=model_script["act_dtype"],
         act_nbits=model_script["act_nbits"],
+        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
         qlevel=model_script["qlevel"],
         target_machine=model_script["target_machine"],
         dataloader=calib_dataloader,
@@ -66,6 +73,7 @@ def get_quant_model(sut, model_script_path, calib_source, qformat_path=None, qpa
             act_granularity=model_script["act_granularity"],
             act_dtype=model_script["act_dtype"],
             act_nbits=model_script["act_nbits"],
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             percentile=model_script["percentile"],
             target_machine=model_script["target_machine"],
         )
@@ -99,6 +107,7 @@ def get_quant_model(sut, model_script_path, calib_source, qformat_path=None, qpa
         act_granularity=model_script["act_granularity"],
         act_dtype=model_script["act_dtype"],
         act_nbits=model_script["act_nbits"],
+        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
         qlevel=model_script["qlevel"],
         target_machine=model_script["target_machine"],
         dataloader=None,
