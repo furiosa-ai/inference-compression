@@ -10,6 +10,7 @@ from .custom_symbolic_trace import custom_symbolic_trace
 from dataset import Dataset
 
 
+
 gen_kwargs = {
     "early_stopping": True,
     "max_new_tokens": 128,
@@ -61,6 +62,16 @@ def get_dummy_kv_cache(input_ids, model_config):
 
     return list(kv_cache)
 
+def get_autoscale_calib_config(model_script, model, calib_dataloader):
+    from .autoscale import extract_kwargs 
+    class dotdict(dict):
+        """dot.notation access to dictionary attributes"""
+        __getattr__ = dict.get
+        __setattr__ = dict.__setitem__
+        __delattr__ = dict.__delitem__
+    args = dotdict(model_script)
+    autoscale_calib_cfg = extract_kwargs.get_autoscale_calib_cfg(args, model, calib_dataloader)
+    return autoscale_calib_cfg
 
 
 
@@ -70,18 +81,40 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
     qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
     qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
-
-    model_type = type(model)
-    model, input_names, concrete_args = custom_symbolic_trace(model)
+  
     
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
-        org_model = None
     else:
         calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
-        org_model = model if model_script["qlevel"]>=3 else None
-
+  
+    run_autoscale = model_script.get("autoscale", 'disabled') != 'disabled'  
+     #prepare for autoscale 
+    if run_autoscale:
+        autoscale_calib_cfg = get_autoscale_calib_config(model_script, model, calib_dataloader)
+ 
+        
+    model_type = type(model)
+    model, input_names, concrete_args = custom_symbolic_trace(model)
     
+    if calib_dataloader is not None and model_script["qlevel"]<=2:
+        org_model = model
+    else:
+        org_model = None
+    
+        
+        
+    # if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
+    #     calib_dataloader = None
+    #     org_model = None
+    # else:
+    #     calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
+    #     org_model = model if model_script["qlevel"]>=3 else None
+
+    #    #prepare for autoscale 
+
+  
+
 
         
     # Extract necessary parameters to initialize QuantPreTrainedModel
@@ -106,21 +139,23 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
     if calib_dataloader:
         model_compressor.calibrate(
-                model=model,
-                model_name=model_script["model"],
-                weight_calib_method=model_script["weight_calib_method"],
-                act_calib_method=model_script["act_calib_method"],
-                # outlier_calib_cfg=model_script['outlier_compensation'],
-                # group_size=args.group_size,
-                percentile=model_script["percentile"],
-                # split_mode=args.split_mode,
-                # autoscale=args.autoscale,
-                # autoscale_calib_method=args.autoscale_calib_method,
-                # autoscale_calib_kwargs=calib_cfg['autoscale'],
-                # autoclip=args.autoclip,
-                target_machine=model_script["target_machine"],
-                calib_dataloader=calib_dataloader,
-                # data_preprocessor=explicit_preproc_fn,
+            model=model,
+            model_name=model_script["model"],
+            calib_dataloader=calib_dataloader,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
+            percentile=model_script["percentile"],
+            target_machine=model_script["target_machine"],
+            act_zp_equalizing=model_script["act_zp_equalizing"] if run_autoscale else 'disabled',
+            autoscale=model_script["autoscale"] if run_autoscale else "disabled",
+            autoscale_calib_method=model_script["autoscale_calib_method"] if run_autoscale else 'auto',
+            autoscale_calib_kwargs=autoscale_calib_cfg if run_autoscale else None,
         )
 
         model_compressor.save(
