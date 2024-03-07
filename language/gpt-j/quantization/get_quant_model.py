@@ -8,6 +8,7 @@ from typing import Optional
 from .QuantGenerationModel import QuantPreTrainedModel
 from .custom_symbolic_trace import custom_symbolic_trace
 from dataset import Dataset
+import copy
 
 
 
@@ -98,7 +99,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     model, input_names, concrete_args = custom_symbolic_trace(model)
     
     if calib_dataloader is not None and model_script["qlevel"] > 2:
-        org_model = model
+        org_model = copy.deepcopy(model)
     else:
         org_model = None
     
@@ -181,7 +182,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
     if org_model:
         model = model_compressor.create_quantsim_model(
-            model,
+            org_model,
             qformat_path = qformat_path,
             qparam_path = qparam_path,
             weight_calib_method=model_script["weight_calib_method"],
