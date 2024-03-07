@@ -194,9 +194,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if run_autoscale else 'disabled'),
-            autoscale=model_script["autoscale"] if run_autoscale else "disabled",
-            autoscale_calib_method=(model_script["autoscale_calib_method"] if run_autoscale else 'auto'),
-            autoscale_calib_kwargs=autoscale_calib_cfg if run_autoscale else None,
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16'
