@@ -97,7 +97,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     model_type = type(model)
     model, input_names, concrete_args = custom_symbolic_trace(model)
     
-    if calib_dataloader is not None and model_script["qlevel"]<=2:
+    if calib_dataloader is not None and model_script["qlevel"] > 2:
         org_model = model
     else:
         org_model = None
@@ -133,6 +133,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         qlevel=model_script["qlevel"],
         target_machine=model_script["target_machine"],
         act_zp_equalizing=(model_script["act_zp_equalizing"] if run_autoscale else 'disabled'),
+        autoscale=model_script["autoscale"] if run_autoscale else "disabled",
         dataloader=calib_dataloader,
         disable_inout=(True, True),
         kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16'
