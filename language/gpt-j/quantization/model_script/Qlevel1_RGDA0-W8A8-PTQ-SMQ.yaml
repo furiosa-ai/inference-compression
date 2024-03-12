@@ -13,5 +13,7 @@ weight_dtype: int8
 weight_granularity: channel
 weight_nbits: 8
 qlevel: 1
-kv_dtype: int8
 autoscale: SmoothQuant
+autoscale_calib_method: auto
+smoothquant_alpha: 0.5
+act_zp_equalizing: linear_all
