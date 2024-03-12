@@ -79,7 +79,13 @@ def main():
     else:
         settings.mode = lg.TestMode.PerformanceOnly
     log_path = os.environ.get("LOG_PATH")
-    log_path = f"build/logs/{args.dataset_path.split('.')[1].split('/')[-1]}"
+    if args.model_script_path != "":
+        if "fp32" in args.model_script_path:
+            log_path = f"build/logs/fp32/{args.dataset_path.split('.')[1].split('/')[-1]}"
+        else:
+            log_path = f"build/logs/{args.model_script_path.split('.')[1].split('/')[-1]}/{args.dataset_path.split('.')[1].split('/')[-1]}"
+    else:
+        log_path = f"build/logs/{args.dataset_path.split('.')[1].split('/')[-1]}"
     if not log_path:
         log_path = "build/logs"
     if not os.path.exists(log_path):
