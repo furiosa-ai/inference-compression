@@ -65,6 +65,8 @@ def main():
         dataset_path=args.dataset_path,
         max_examples=args.max_examples,
         use_gpu=args.gpu,
+        num_splits=args.num_splits,
+        split_idx=args.split_idx
     )
 
     if args.use_mcp:
