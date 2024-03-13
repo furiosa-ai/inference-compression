@@ -19,7 +19,7 @@ gen_kwargs = {
 
 
 class SUT_base():
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu=False):
+    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu=False, num_splits=1, split_idx=0):
         # TODO : Pass model file name to init instead of args
         print("Loading PyTorch model...")
         self.model_name = "EleutherAI/gpt-j-6B"
@@ -63,7 +63,7 @@ class SUT_base():
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.data_object = Dataset(
-            self.dataset_path, total_count_override=max_examples)
+            self.dataset_path, total_count_override=max_examples, num_splits=num_splits, split_idx=split_idx)
         self.qsl = lg.ConstructQSL(self.data_object.count, self.data_object.perf_count,
                                    self.data_object.LoadSamplesToRam, self.data_object.UnloadSamplesFromRam)
 
@@ -130,8 +130,8 @@ class SUT_base():
 
 
 class SUT_Offline(SUT_base):
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu):
-        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu)
+    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx):
+        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx)
     '''IssueQuery and inference methods implemented in Base class'''
 
 
@@ -193,9 +193,9 @@ class SUT_SingleStream(SUT_base):
             print("Completed : ", self.total_samples_done)
 
 
-def get_SUT(model_path, scenario, dtype, dataset_path, max_examples, use_gpu=False):
+def get_SUT(model_path, scenario, dtype, dataset_path, max_examples, use_gpu=False, num_splits=1, split_idx=0):
     if scenario == "Offline":
-        return SUT_Offline(model_path, dtype, dataset_path, max_examples, use_gpu)
+        return SUT_Offline(model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx)
     elif scenario == "Server":
         return SUT_Server(model_path, dtype, dataset_path, max_examples, use_gpu)
     elif scenario == "SingleStream":
