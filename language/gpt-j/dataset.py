@@ -26,7 +26,7 @@ PROMPT_DICT = {
 
 
 class Dataset():
-    def __init__(self, dataset_path, batch_size=1, pad_val=1, pad_max=196, total_count_override=None, perf_count_override=None):
+    def __init__(self, dataset_path, batch_size=1, pad_val=1, pad_max=196, total_count_override=None, perf_count_override=None, num_splits=1, split_idx=0):
         print("Constructing QSL")
 
         self.dataset = "cnn_dailymail"
@@ -44,6 +44,9 @@ class Dataset():
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.list_data_dict = utils.jload(self.dataset_path)
+        if num_splits > 1:
+            n_splited_data = int(len(self.list_data_dict)/num_splits)
+            self.list_data_dict = self.list_data_dict[split_idx*n_splited_data:(split_idx+1)*n_splited_data]
 
         prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
         self.sources = [prompt_input.format_map(
