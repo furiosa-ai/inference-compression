@@ -39,7 +39,7 @@ def get_args():
     parser.add_argument("--max_examples", type=int, default=None,
                         help="Maximum number of examples to consider (not limited by default)")
     parser.add_argument("--model_script_path", default="./quantization/model_script/Qlevel1_RGDA0-W8A16-PTQ.yaml", help="")
-    parser.add_argument("--use_mcp", action="store_true", help="use mcp to quantize the model")
+    parser.add_argument("--use_mcp", action="store_true", default=False, help="use mcp to quantize the model")
     parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     args = parser.parse_args()
     return args
