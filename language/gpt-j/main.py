@@ -6,6 +6,8 @@ import sys
 from backend import get_SUT
 import quantization 
 
+import time
+from datetime import timedelta
 
 sys.path.insert(0, os.getcwd())
 
@@ -106,8 +108,13 @@ def main():
     log_settings = lg.LogSettings()
     log_settings.log_output = log_output_settings
     log_settings.enable_trace = True
- 
+    start_time = time.time()
     lg.StartTestWithLogSettings(sut.sut, sut.qsl, settings, log_settings, args.audit_conf)
+
+    end_time = time.time()
+    time_seconds = end_time - start_time
+    time_hour = timedelta(seconds=time_seconds)
+    print(f"Test running time: {time_hour}")
     print("Test Done!")
 
     print("Destroying SUT...")
