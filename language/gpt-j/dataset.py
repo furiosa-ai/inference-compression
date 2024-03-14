@@ -46,7 +46,9 @@ class Dataset():
         self.list_data_dict = utils.jload(self.dataset_path)
         if num_splits > 1:
             n_splited_data = int(len(self.list_data_dict)/num_splits)
-            self.list_data_dict = self.list_data_dict[split_idx*n_splited_data:(split_idx+1)*n_splited_data]
+            start_idx = split_idx*n_splited_data
+            end_idx= (split_idx+1)*n_splited_data if split_idx!=num_splits-1 else len(self.list_data_dict) + 1
+            self.list_data_dict = self.list_data_dict[start_idx:end_idx]
 
         prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
         self.sources = [prompt_input.format_map(
