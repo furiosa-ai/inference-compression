@@ -8,6 +8,11 @@ import model_compressor
 import torch
 
 from . import transform_descriptor_utils
+from transformers.models.bloom.modeling_bloom import BloomBlock, BloomForCausalLM
+from transformers.models.llama.modeling_llama import LlamaAttention, LlamaForCausalLM
+from transformers.models.opt.modeling_opt import OPTAttention, OPTForCausalLM
+from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJForCausalLM
+from transformers.models.bert.modeling_bert import BertForQuestionAnswering
 
 __all__ = ["get_autoscale_calib_cfg", "valid_check_calib_cfg"]
 
@@ -71,6 +76,10 @@ def get_autoscale_calib_cfg(
         )
     calib_cfg['nodes_excluded_from_auto_clip_calib'] = args.nodes_excluded_from_auto_clip_calib
 
+    if args.unify_smooth_factor and not isinstance(model, GPTJForCausalLM):
+        raise ValueError("In current, unifying smooth factor feature only supports GPT-J.")
+    calib_cfg['unify_smooth_factor'] = args.unify_smooth_factor
+
     return calib_cfg
 
 
@@ -113,11 +122,6 @@ def _check_nodes_excluded_from_auto_clip_calib(list_to_check):
 
 
 def _get_predefined_proxy_target_module(torch_model):
-    from transformers.models.bloom.modeling_bloom import BloomBlock, BloomForCausalLM
-    from transformers.models.llama.modeling_llama import LlamaAttention, LlamaForCausalLM
-    from transformers.models.opt.modeling_opt import OPTAttention, OPTForCausalLM
-    from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJForCausalLM
-
     if isinstance(torch_model, LlamaForCausalLM):
         # Todo - need to check
         proxy_target_module_type = [LlamaAttention]
@@ -149,11 +153,6 @@ def _get_predefined_proxy_target_module(torch_model):
 
 
 def _get_predefined_excluded_from_auto_scale_calib(torch_model, autoscale):
-    from transformers.models.bloom.modeling_bloom import BloomForCausalLM
-    from transformers.models.llama.modeling_llama import LlamaForCausalLM
-    from transformers.models.opt.modeling_opt import OPTForCausalLM
-    from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
-    from transformers.models.bert.modeling_bert import BertForQuestionAnswering
 
     if isinstance(torch_model, LlamaForCausalLM):
         # Todo - need to check
@@ -196,11 +195,6 @@ def _get_predefined_excluded_from_auto_scale_calib(torch_model, autoscale):
 
 
 def _get_predefined_excluded_from_auto_clip_calib(torch_model):
-    from transformers.models.bloom.modeling_bloom import BloomForCausalLM
-    from transformers.models.llama.modeling_llama import LlamaForCausalLM
-    from transformers.models.opt.modeling_opt import OPTForCausalLM
-    from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
-
     if isinstance(torch_model, LlamaForCausalLM):
         nodes_list = ['q_proj', 'k_proj', 'lm_head']
     elif isinstance(torch_model, OPTForCausalLM):
@@ -282,10 +276,6 @@ def _find_proxy_modules_for_each_subgraph(
 
 
 def _get_blocks(model):
-    from transformers.models.bloom.modeling_bloom import BloomForCausalLM
-    from transformers.models.llama.modeling_llama import LlamaForCausalLM
-    from transformers.models.opt.modeling_opt import OPTForCausalLM
-    from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
 
     if isinstance(model, LlamaForCausalLM):
         layers = model.model.layers
@@ -345,8 +335,6 @@ def _extract_layer_kwargs(torch_model, samples, cache_ckpt_folder_path):
         model_compressor.utils.accelerate.big_modeling.load_checkpoint_in_model(
             torch_model, model_path
         )
-
-    from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
 
     if isinstance(torch_model, GPTJForCausalLM):
         layers[0] = Catcher_GPTJ(layers[0])
