@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from transformers.utils.fx import symbolic_trace
 import model_compressor
 from typing import Optional
-from .QuantGenerationModel import QuantPreTrainedModel
+from .QuantPreTrainedModel import QuantPreTrainedModel
 from .custom_symbolic_trace import custom_symbolic_trace
 from dataset import Dataset
 import copy
@@ -97,7 +97,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
  
         
     model_type = type(model)
-    device = model.device
     model, input_names, concrete_args = custom_symbolic_trace(model)
     
     if calib_dataloader is not None and model_script["qlevel"] > 2:
