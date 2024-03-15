@@ -19,7 +19,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_script_name", required=True,
                         help="path to mlperf_log_accuracy.json")
-    parser.add_argument("--dataset-file", required=True,
+    parser.add_argument("--dataset-file", default="./data/cnn_eval.json",
                         help="path to cnn_eval.json")
     parser.add_argument("--verbose", action="store_true",
                         help="verbose messages")
