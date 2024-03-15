@@ -97,6 +97,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
  
         
     model_type = type(model)
+    device = model.device
     model, input_names, concrete_args = custom_symbolic_trace(model)
     
     if calib_dataloader is not None and model_script["qlevel"] > 2:

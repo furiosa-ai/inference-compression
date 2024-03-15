@@ -4,7 +4,7 @@ import torch
 from transformers.modeling_utils import PreTrainedModel
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import inspect
-
+import pdb
 
 
 
@@ -16,6 +16,7 @@ class QuantPreTrainedModel(PreTrainedModel):
         self.config = quant_model.config
         self.input_names = input_names
         self.concrete_args = concrete_args 
+
         
     def can_generate(self):
         return self.model_type.can_generate()
@@ -66,9 +67,10 @@ class QuantPreTrainedModel(PreTrainedModel):
                 items_to_delete.append(key)
         
         updated_kwargs = {key: value for key, value in kwargs.items() if key not in items_to_delete}
-
+        
         if "past_key_values" not in updated_kwargs.keys() or updated_kwargs["past_key_values"] == None: #add dummy past_key_valeus
-            updated_kwargs["past_key_values"] = tuple([[None, None]] * self.config.n_layer)
+            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            updated_kwargs["past_key_values"] = tuple([[torch.zeros(0).to(device), torch.zeros(0).to(device)]] * self.config.n_layer)
         
         return CausalLMOutputWithPast(self.quant_model(**updated_kwargs))
     
