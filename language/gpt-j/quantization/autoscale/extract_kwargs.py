@@ -79,6 +79,8 @@ def get_autoscale_calib_cfg(
     if args.unify_smooth_factor and not isinstance(model, GPTJForCausalLM):
         raise ValueError("In current, unifying smooth factor feature only supports GPT-J.")
     calib_cfg['unify_smooth_factor'] = args.unify_smooth_factor
+    calib_cfg['module_name_to_replace_smooth_factor'] = args.module_name_to_replace_smooth_factor
+    calib_cfg['module_name_for_smooth_factor'] = args.module_name_for_smooth_factor
 
     return calib_cfg
 
