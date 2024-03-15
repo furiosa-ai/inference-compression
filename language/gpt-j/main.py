@@ -8,6 +8,7 @@ import quantization
 
 import time
 from datetime import timedelta
+from quantization.utils import torch_config
 
 sys.path.insert(0, os.getcwd())
 
@@ -45,6 +46,7 @@ def get_args():
     parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     parser.add_argument("--num_splits", type=int, default=1, help="")
     parser.add_argument("--split_idx", type=int, default=0, help="")
+    parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
     args = parser.parse_args()
     return args
 
@@ -72,6 +74,7 @@ def main():
     )
 
     if args.use_mcp:
+        torch_config.set_optimization(args)
         sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.recalibrate)
     
     settings = lg.TestSettings()
