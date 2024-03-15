@@ -105,22 +105,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     else:
         org_model = None
     
-
-     
-        
-    # if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
-    #     calib_dataloader = None
-    #     org_model = None
-    # else:
-    #     calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
-    #     org_model = model if model_script["qlevel"]>=3 else None
-
-    #    #prepare for autoscale 
-
-  
-
-
-        
     # Extract necessary parameters to initialize QuantPreTrainedModel
     model = model_compressor.create_quantsim_model(
         model,
@@ -136,7 +120,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         act_nbits=model_script["act_nbits"],
         qlevel=model_script["qlevel"],
         target_machine=model_script["target_machine"],
-        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+        act_zp_equalizing=model_script["act_zp_equalizing"] if  "act_zp_equalizing" in model_script else 'disabled',
         dataloader=calib_dataloader,
         disable_inout=(True, True),
         kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16'
@@ -157,7 +141,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             act_nbits=model_script["act_nbits"],
             percentile=model_script["percentile"],
             target_machine=model_script["target_machine"],
-            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            act_zp_equalizing=model_script["act_zp_equalizing"] if  "act_zp_equalizing" in model_script else 'disabled',
             autoscale=model_script["autoscale"] if run_autoscale else "disabled",
             autoscale_calib_method=(model_script["autoscale_calib_method"] if run_autoscale else 'auto'),
             autoscale_calib_kwargs=autoscale_calib_cfg if run_autoscale else None,
@@ -197,7 +181,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             act_nbits=model_script["act_nbits"],
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
-            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            act_zp_equalizing=model_script["act_zp_equalizing"] if  "act_zp_equalizing" in model_script else 'disabled',
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16'
