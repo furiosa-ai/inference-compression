@@ -47,6 +47,7 @@ def get_args():
     parser.add_argument("--num_splits", type=int, default=1, help="")
     parser.add_argument("--split_idx", type=int, default=0, help="")
     parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
+    parser.add_argument("--model_source", type = str, default = "transformers", help="the type of GPTJForCausalLM to use")
     args = parser.parse_args()
     return args
 
@@ -62,9 +63,6 @@ scenario_map = {
 def main():
     args = get_args()
 
-    set_optimization(args)
-    random_seed()
-
     sut = get_SUT(
         model_path=args.model_path,
         scenario=args.scenario,
@@ -73,7 +71,8 @@ def main():
         max_examples=args.max_examples,
         use_gpu=args.gpu,
         num_splits=args.num_splits,
-        split_idx=args.split_idx
+        split_idx=args.split_idx,
+        model_source = args.model_source,
     )
 
     if args.use_mcp:

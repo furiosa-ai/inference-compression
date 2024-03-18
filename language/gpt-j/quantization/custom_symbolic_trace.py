@@ -1,18 +1,28 @@
-from transformers import PreTrainedModel, GPTJForCausalLM
+from transformers import PreTrainedModel
+from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM
 from transformers.utils.fx import HFTracer, get_concrete_args, check_if_model_is_supported
 import torch
 from torch.fx import Tracer, GraphModule
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 
-def get_input_names_and_concrete_args(model: PreTrainedModel):
-    if type(model) == GPTJForCausalLM:
-        custom_concrete_args = {'use_cache': True, 'return_dict': True,
-                                'output_attentions': False, 'output_hidden_states': False}
-        input_names = ["input_ids", "past_key_values",
-                       "position_ids", "attention_mask"]
-    else:
+def get_input_names_and_concrete_args(model: PreTrainedModel, prefill_mode = True):
+    module = type(model).__module__.split('.')[0]
+    if module not in ['transformers', 'furiosa_llm_models']:
         raise NotImplementedError
+    
+    #defined according to MLperf models
+    if prefill_mode:
+        custom_concrete_args = {'use_cache': False, 'return_dict': True,
+                                    'output_attentions': False, 'output_hidden_states': False} 
+        input_names = ["input_ids", "position_ids", "attention_mask"]
+    else:
+        custom_concrete_args = {'use_cache': True, 'return_dict': True,
+                                    'output_attentions': False, 'output_hidden_states': False}
+        input_names = ["input_ids", "past_key_values", "position_ids", "attention_mask"]
+        
+
+
 
     if input_names is None:
         input_names = model.dummy_inputs.keys()
@@ -28,9 +38,9 @@ def get_input_names_and_concrete_args(model: PreTrainedModel):
     return input_names, concrete_args
 
 
-def custom_symbolic_trace(model: PreTrainedModel, disable_check: bool = False) -> GraphModule:
-
-    input_names, concrete_args = get_input_names_and_concrete_args(model)
+def custom_symbolic_trace(model: PreTrainedModel, prefill_mode = True, disable_check: bool = False) -> GraphModule:
+    
+    input_names, concrete_args = get_input_names_and_concrete_args(model, prefill_mode)
 
     if not disable_check:
         check_if_model_is_supported(model)
