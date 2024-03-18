@@ -9,6 +9,7 @@ from .QuantPreTrainedModel import QuantPreTrainedModel
 from .custom_symbolic_trace import custom_symbolic_trace
 from dataset import Dataset
 import copy
+import pdb
 
 
 
@@ -97,8 +98,13 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
  
         
     model_type = type(model)
-    model, input_names, concrete_args = custom_symbolic_trace(model)
-    
+    module = type(model).__module__.split('.')[0]
+    if module == 'transformers':
+        model, input_names, concrete_args = custom_symbolic_trace(model, prefill_mode = False)
+    elif module =='furiosa_llm_models':
+        prefill_model, input_names_prefill, concrete_args_prefill = custom_symbolic_trace(model, prefill_mode = True)
+        decode_model, input_names_decode, concrete_args_decode = custom_symbolic_trace(model, prefill_mode = False)
+    pdb.set_trace()
     if calib_dataloader is not None and model_script["qlevel"] > 2:
         org_model = copy.deepcopy(model)
         org_model.config = model.config

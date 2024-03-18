@@ -10,6 +10,7 @@ import mlperf_loadgen as lg
 from dataset import Dataset
 
 
+
 gen_kwargs = {
     "early_stopping": True,
     "max_new_tokens": 128,
@@ -19,7 +20,7 @@ gen_kwargs = {
 
 
 class SUT_base():
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu=False, num_splits=1, split_idx=0):
+    def __init__(self, model_path, dtype, dataset_path, max_examples, model_source, use_gpu=False, num_splits=1, split_idx=0):
         # TODO : Pass model file name to init instead of args
         print("Loading PyTorch model...")
         self.model_name = "EleutherAI/gpt-j-6B"
@@ -37,8 +38,14 @@ class SUT_base():
         else:
             self.amp_enabled = False
             self.amp_dtype = torch.float32
-
-        self.model = AutoModelForCausalLM.from_pretrained(
+            
+        if model_source == 'transformers':
+            model_cls = AutoModelForCausalLM
+        elif model_source == 'furiosa_llm':
+            from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM
+            model_cls = GPTJForCausalLM
+        
+        self.model = model_cls.from_pretrained(
             self.model_path,
             device_map="auto" if not self.use_gpu else None,
             low_cpu_mem_usage=True if not self.use_gpu else False,
@@ -130,15 +137,14 @@ class SUT_base():
 
 
 class SUT_Offline(SUT_base):
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx):
-        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx)
+    def __init__(self, model_path, dtype, dataset_path, max_examples,  use_gpu, num_splits, split_idx, model_source):
+        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx, model_source)
     '''IssueQuery and inference methods implemented in Base class'''
 
 
 class SUT_Server(SUT_base):
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu):
-
-        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu)
+    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, model_source):
+        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, model_source)
         self.total_samples_done = 0
         self.sut = lg.ConstructSUT(self.issue_queries, self.flush_queries)
         print("SUT Server")
@@ -166,8 +172,8 @@ class SUT_Server(SUT_base):
 
 
 class SUT_SingleStream(SUT_base):
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu):
-        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu)
+    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, model_source):
+        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, model_source)
         self.sut = lg.ConstructSUT(self.issue_queries, self.flush_queries)
         self.total_samples_done = 0
 
@@ -193,10 +199,10 @@ class SUT_SingleStream(SUT_base):
             print("Completed : ", self.total_samples_done)
 
 
-def get_SUT(model_path, scenario, dtype, dataset_path, max_examples, use_gpu=False, num_splits=1, split_idx=0):
+def get_SUT(model_path, scenario, dtype, dataset_path, max_examples, model_source, use_gpu=False, num_splits=1, split_idx=0):
     if scenario == "Offline":
-        return SUT_Offline(model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx)
+        return SUT_Offline(model_path, dtype, dataset_path, max_examples, model_source, use_gpu, num_splits, split_idx)
     elif scenario == "Server":
-        return SUT_Server(model_path, dtype, dataset_path, max_examples, use_gpu)
+        return SUT_Server(model_path, dtype, dataset_path, max_examples, model_source, use_gpu)
     elif scenario == "SingleStream":
-        return SUT_SingleStream(model_path, dtype, dataset_path, max_examples, use_gpu)
+        return SUT_SingleStream(model_path, dtype, dataset_path, max_examples, model_source, use_gpu)
