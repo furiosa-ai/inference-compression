@@ -43,7 +43,6 @@ def make_dataloader(qsl, batch_size, n_calib):
             'token_type_ids': torch.LongTensor(feature.segment_ids),
         })
     
-    collate_fn = MyCollate()
-    dataloader = DataLoader(data_list, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    dataloader = DataLoader(data_list, batch_size=batch_size)
 
     return dataloader
