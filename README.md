@@ -9,12 +9,15 @@
 git clone --branch v4.1-internal https://github.com/furiosa-ai/inference.git
 cd inference
 
-# (optional) if GCC Compiler is not installed on Ubuntu,
+# (optional, for mlperf loadgen) if GCC Compiler is not installed on Ubuntu,
 apt-get update && apt-get install build-essential -y
+
+# (optional, for Stable Diffusion only) it requires cv2 related devian packages to run Stable Diffusion
+DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install libgl1 libglib2.0-0 -y
 ```
 
 ## How to run end-to-end evaluation
-Ene-to-end(E2E) evaluation is the process of downloading models and dataset, building a Python environment, and performing model accuracy evaluation. E2E scripts are developed based on [mlperf v3.1](https://github.com/mlcommons/inference/tree/v3.1). 
+Ene-to-end(E2E) evaluation is the process of downloading models and dataset, building a Python environment, and performing model accuracy evaluation. E2E scripts are developed based on [f9a643c](https://github.com/mlcommons/inference/commit/f9a643c0a0e920588da1b51a1d822e1071a9dbec). 
 
 To run E2E evaluation:
 
@@ -29,7 +32,7 @@ bash scripts/build_[model_name]_env.sh
 bash scripts/eval_[model_name].sh
 ```
 
-- `model_name` includes [resnet, retinanet, 3d-unet, bert, gpt-j, rnnt, all]
+- `model_name` includes [resnet, retinanet, 3d-unet, bert, gpt-j, rnnt, llama2, stablediffusion, all]
 - For example, to run E2E ResNet evaluation
     ```
     make resnet
@@ -45,8 +48,36 @@ bash scripts/eval_[model_name].sh
     bash scripts/eval_resnet.sh
     ```
 
+### Configurability
+Some parameters are configurable, for example,
+- llama2-70b
+    
+    The command `make llama2` is equivalent to
+    ```
+    export SCENARIO=Offline # SCENARIO is one of [Offline, Server]
+    export N_COUNT=24576   # N_COUNT is a number between [1, 24576]
+    export DATA_TYPE=float32    # DATA_TYPE is one of [float32, float16, bfloat16]
+    export DEVICE=cuda:0    # DEVICE is one of [cpu, cuda:0]
+    make llama2
+    ```
+    Each environment variable above has the value as default, which can be changed to another.
+
+Likewise,
+
+- stable-diffusion-xl-base
+
+    ```
+    export SCENARIO=Offline # SCENARIO is one of [Offline, SingleStream, MultiStream, Server]
+    export N_COUNT=5000   # N_COUNT is a number between [1, 5000]
+    export DATA_TYPE=fp32    # DATA_TYPE is one of [fp32, fp16, bf16]
+    export DEVICE=cuda    # DEVICE is one of [cpu, cuda]
+    make stablediffusion
+    ```
+
 
 ## Evaluation results
+
+### v3.1
 - Default settings:
     - scenario: Offline
     - model framework: pytorch
@@ -55,7 +86,7 @@ bash scripts/eval_[model_name].sh
     - GPU: 1 NVIDIA A100-SXM4-80GB
     - CPU: Intel(R) Xeon(R) Platinum 8358 CPU
 
-| model name | internal result    | v3.1 mlperf result                                                                                                               | input shape*            | dataset                                                                                                                               |
+| model name | internal result    | mlperf result                                                                                                               | input shape*            | dataset                                                                                                                               |
 |------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
 | resnet     | 76.144%(top1 Acc.) | [76.014%(top1 Acc.)](https://github.com/mlcommons/inference/blob/v3.1/vision/classification_and_detection/README.md?plain=1#L18) | 1x3x224x224(NxCxHxW)       | [Imagenet2012 validation](https://github.com/mlcommons/inference/blob/v3.1/vision/classification_and_detection/README.md?plain=1#L86) (num_data: 50,000) |
 | retinanet  | 0.3755(mAP)        | [0.3755(mAP)](https://github.com/mlcommons/inference/blob/v3.1/vision/classification_and_detection/README.md?plain=1#L21)        | 1x3x800x800(NxCxHxW)       | [MLPerf Openimages](https://github.com/mlcommons/inference/blob/v3.1/vision/classification_and_detection/README.md?plain=1#L87) (num_data: 24,781)      |
@@ -89,6 +120,45 @@ make log_[model_name]
     make log_resnet
     ```
     the evaluation log of ResNet will be pulled to `logs/internal/resnet`.
+
+
+### v4.0
+- Default settings:
+    - scenario: Offline
+    - model framework: pytorch
+
+- LLaMA2-70b
+
+    | data type | internal result | mlperf result                                                                                                      | elapsed time | device |
+    |-----------|-----------------|--------------------------------------------------------------------------------------------------------------------|--------------|--------|
+    | float32   | 44.4312(Rouge1) | [44.4312(Rouge1)](https://github.com/mlcommons/inference/blob/master/tools/submission/submission_checker.py#L1128) | 6.6 days     | 6 H100 |
+    | float16   | 44.4362(Rouge1) |                                                          -                                                         | 3.5 days     | 3 A100 |
+    | bfloat16  | 44.4625(Rouge1) |                                                          -                                                         | 3.6 days     | 3 A100 |
+
+- Stable Diffusion XL base
+
+    | data type | internal result     | mlperf result                                                                                                          | elapsed time | device    |
+    |-----------|---------------------|------------------------------------------------------------------------------------------------------------------------|--------------|-----------|
+    | float32   | 31.7466(clip_score) | [31.6863(clip_score)](https://github.com/mlcommons/inference/blob/master/tools/submission/submission_checker.py#L1129) | 24 hours     | 1 RTX3090 |
+    | float16   | 31.7558(clip_score) |                                                            -                                                           | 7.5 hours    | 1 RTX3090 |
+    | bfloat16  | 31.7380(clip_score) |                                                            -                                                           | 8.3 hours    | 1 RTX3090 |
+
+
+To get verified evaluation log:
+
+```
+# (optional) if not installed,
+pip install dvc[s3]
+
+make log_[model_name]
+```
+
+- model_name includes [llama2, stablediffusion, all]
+- For example, with
+    ```
+    make log_llama2
+    ```
+    the evaluation logs of LLaMA2-70b will be pulled to logs/internal/llama2-70b.
 
 
 # MLPerf™ Inference Benchmark Suite
