@@ -64,6 +64,9 @@ scenario_map = {
 
 def main():
     args = get_args()
+    
+    set_optimization(args)
+    random_seed()
 
     sut = None
 

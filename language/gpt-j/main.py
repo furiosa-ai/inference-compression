@@ -8,7 +8,7 @@ import quantization
 
 import time
 from datetime import timedelta
-from quantization.utils import torch_config
+from utils import set_optimization, random_seed
 
 sys.path.insert(0, os.getcwd())
 
@@ -62,6 +62,9 @@ scenario_map = {
 def main():
     args = get_args()
 
+    set_optimization(args)
+    random_seed()
+
     sut = get_SUT(
         model_path=args.model_path,
         scenario=args.scenario,
@@ -74,7 +77,6 @@ def main():
     )
 
     if args.use_mcp:
-        torch_config.set_optimization(args)
         sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.recalibrate)
     
     settings = lg.TestSettings()
