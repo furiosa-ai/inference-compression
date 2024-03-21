@@ -19,3 +19,5 @@ autoscale_calib_method: auto
 smoothquant_alpha: 0.5
 act_zp_equalizing: linear_all
 unify_smooth_factor: true
+module_name_for_smooth_factor: fc_in
+module_name_to_replace_smooth_factor: q_proj
