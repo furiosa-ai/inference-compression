@@ -1,5 +1,12 @@
 import torch
+import numpy as np
+import random 
 
+def random_seed(seed=42):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 def set_optimization(args):
     if args.torch_optim == 'default':
