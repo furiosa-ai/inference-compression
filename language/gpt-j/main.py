@@ -5,6 +5,12 @@ import os
 
 import sys
 from backend import get_SUT
+import quantization 
+
+import time
+from datetime import timedelta
+from utils import set_optimization, random_seed
+
 sys.path.insert(0, os.getcwd())
 
 
@@ -49,6 +55,9 @@ scenario_map = {
 def main():
     args = get_args()
 
+    set_optimization(args)
+    random_seed()
+
     sut = get_SUT(
         model_path=args.model_path,
         scenario=args.scenario,
@@ -58,6 +67,9 @@ def main():
         use_gpu=args.gpu,
     )
 
+    if args.use_mcp:
+        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.recalibrate)
+    
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
     # Need to update the conf

@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.getcwd(), "..", "..", "lon"))
 from absl import app
 from absl import flags
 from quantization import get_quant_model
+from utils import set_optimization, random_seed
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -55,6 +56,7 @@ def get_args():
     parser.add_argument("--use_mcp", action="store_true", help="use mcp to quantize the model")
     parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     parser.add_argument("--n_calib", type=int,  default=-1)
+    parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
 
     args = parser.parse_args()
     return args
@@ -69,6 +71,9 @@ scenario_map = {
 
 def main():
     args = get_args()
+    
+    set_optimization(args)
+    random_seed()
 
     sut = None
 
