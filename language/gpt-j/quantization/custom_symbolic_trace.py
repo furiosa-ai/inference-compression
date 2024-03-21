@@ -12,13 +12,11 @@ def get_input_names_and_concrete_args(model: PreTrainedModel, prefill_mode = Tru
         raise NotImplementedError
     
     #defined according to MLperf models
+    custom_concrete_args = {'use_cache': True, 'return_dict': True,
+                                    'output_attentions': False, 'output_hidden_states': False}
     if prefill_mode:
-        custom_concrete_args = {'use_cache': False, 'return_dict': True,
-                                    'output_attentions': False, 'output_hidden_states': False} 
         input_names = ["input_ids", "position_ids", "attention_mask"]
     else:
-        custom_concrete_args = {'use_cache': True, 'return_dict': True,
-                                    'output_attentions': False, 'output_hidden_states': False}
         input_names = ["input_ids", "past_key_values", "position_ids", "attention_mask"]
         
 

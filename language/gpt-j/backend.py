@@ -41,8 +41,11 @@ class SUT_base():
             
         if model_source == 'transformers':
             model_cls = AutoModelForCausalLM
-        elif model_source == 'furiosa_llm':
+        elif model_source == 'furiosa_llm_original':
             from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM
+            model_cls = GPTJForCausalLM
+        elif model_source == 'furiosa_llm_paged_attention':
+            from furiosa_llm_models.models.gptj.modeling_gptj_paged_attention_concat import GPTJForCausalLM
             model_cls = GPTJForCausalLM
         
         self.model = model_cls.from_pretrained(
@@ -51,6 +54,7 @@ class SUT_base():
             low_cpu_mem_usage=True if not self.use_gpu else False,
             torch_dtype=self.amp_dtype
         )
+        
 
         # Cast the model to GPU if the flag is set.
         if self.use_gpu:
@@ -112,7 +116,6 @@ class SUT_base():
             input_batch = dict()
             input_batch['input_ids'] = input_ids_tensor
             input_batch['attention_mask'] = input_masks_tensor
-
             output_batch = self.model.generate(
                 **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
 
