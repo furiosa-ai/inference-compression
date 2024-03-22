@@ -40,7 +40,7 @@ def make_dummy_dataloader(data_object, batch_size, model_config, use_cache=False
                 "Not implemented yet. Will implement when need arises.")
     return DataLoader(data_list, batch_size)
 
-def make_calib_dataloader(calib_dataset_path, batch_size, num_layer):
+def make_calib_dataloader(calib_dataset_path, batch_size):
     data_object = Dataset(calib_dataset_path, batch_size)
     data_list = []
     for idx in range(len(data_object.source_encoded_input_ids)):
@@ -84,12 +84,12 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
     qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
     qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
-  
+    
     
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
-        calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
+        calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'])
   
     run_autoscale = model_script.get("autoscale", 'disabled') != 'disabled'  
      #prepare for autoscale 
@@ -99,39 +99,58 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         
     model_type = type(model)
 
-    prefill_model, input_names_prefill, concrete_args_prefill = custom_symbolic_trace(model, prefill_mode = True)
-    decode_model, input_names_decode, concrete_args_decode = custom_symbolic_trace(model, prefill_mode = False)
-
-    if calib_dataloader is not None and model_script["qlevel"] > 2:
-        org_model = copy.deepcopy(model)
-        org_model.config = model.config
-    else:
-        org_model = None
+    prefill_model, prefill_input_names, prefill_concrete_args = custom_symbolic_trace(model, prefill_mode = True)
+    decode_model, decode_input_names, decode_concrete_args = custom_symbolic_trace(model, prefill_mode = False)
     
-    # Extract necessary parameters to initialize QuantPreTrainedModel
-    model = model_compressor.create_quantsim_model(
-        model,
-        qformat_path = qformat_path if calib_dataloader is None else None,
-        qparam_path = qparam_path if calib_dataloader is None else None,
-        weight_calib_method=model_script["weight_calib_method"],
-        weight_granularity=model_script["weight_granularity"],
-        weight_dtype=model_script["weight_dtype"],
-        weight_nbits=model_script["weight_nbits"],
-        act_calib_method=model_script["act_calib_method"],
-        act_granularity=model_script["act_granularity"],
-        act_dtype=model_script["act_dtype"],
-        act_nbits=model_script["act_nbits"],
-        qlevel=model_script["qlevel"],
-        target_machine=model_script["target_machine"],
-        act_zp_equalizing=model_script["act_zp_equalizing"] if  "act_zp_equalizing" in model_script else 'disabled',
-        dataloader=calib_dataloader,
-        disable_inout=(True, True),
-        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16'
-    )
+    input_names = {
+        "prefill_input_names" : prefill_input_names,
+        "decode_input_names" : decode_input_names,
+    }
+
+    concrete_args = {
+        "prefill_concrete_args": prefill_concrete_args,
+        "decode_concrete_args": decode_concrete_args,
+    }
+
+
+    # if calib_dataloader is not None and model_script["qlevel"] > 2:
+    #     org_prefill_model = copy.deepcopy(prefill_model)
+    # if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
+    #     calib_dataloader = None
+    #     org_model = None
+    # else:
+    #     calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
+    #     org_model = model if model_script["qlevel"]>=3 else None
+
+    #    #prepare for autoscale 
+
+  
 
     if calib_dataloader:
+        prefill_model_for_calib = copy.deepcopy(prefill_model)
+        # Extract necessary parameters to initialize QuantPreTrainedModel
+        prefill_model_for_calib = model_compressor.create_quantsim_model(
+            prefill_model_for_calib,
+            qformat_path = None,
+            qparam_path = None,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
+            qlevel=model_script["qlevel"],
+            target_machine=model_script["target_machine"],
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            dataloader=calib_dataloader,
+            disable_inout=(True, True),
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+        )
+
         model_compressor.calibrate(
-            model=model,
+            model=prefill_model_for_calib,
             model_name=model_script["model"],
             calib_dataloader=calib_dataloader,
             weight_calib_method=model_script["weight_calib_method"],
@@ -151,7 +170,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         )
 
         model_compressor.save(
-                model,
+                prefill_model_for_calib,
                 qparam_out_path=qparam_path,
                 qformat_out_path=qformat_path,
                 weight_calib_method=model_script["weight_calib_method"],
@@ -166,28 +185,60 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             )
 
 
-        model.recompile()
+        del prefill_model_for_calib
 
 
-    if org_model:
-        model = model_compressor.create_quantsim_model(
-            org_model,
-            qformat_path = qformat_path,
-            qparam_path = qparam_path,
-            weight_calib_method=model_script["weight_calib_method"],
-            weight_granularity=model_script["weight_granularity"],
-            weight_dtype=model_script["weight_dtype"],
-            weight_nbits=model_script["weight_nbits"],
-            act_calib_method=model_script["act_calib_method"],
-            act_granularity=model_script["act_granularity"],
-            act_dtype=model_script["act_dtype"],
-            act_nbits=model_script["act_nbits"],
-            qlevel=model_script["qlevel"],
-            target_machine=model_script["target_machine"],
-            act_zp_equalizing=model_script["act_zp_equalizing"] if  "act_zp_equalizing" in model_script else 'disabled',
-            dataloader=None,
-            disable_inout=(True, True),
-            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16'
-        )
+    
+    prefill_model = model_compressor.create_quantsim_model(
+        prefill_model,
+        qformat_path = qformat_path,
+        qparam_path = qparam_path,
+        weight_calib_method=model_script["weight_calib_method"],
+        weight_granularity=model_script["weight_granularity"],
+        weight_dtype=model_script["weight_dtype"],
+        weight_nbits=model_script["weight_nbits"],
+        act_calib_method=model_script["act_calib_method"],
+        act_granularity=model_script["act_granularity"],
+        act_dtype=model_script["act_dtype"],
+        act_nbits=model_script["act_nbits"],
+        qlevel=model_script["qlevel"],
+        target_machine=model_script["target_machine"],
+        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+        dataloader=None,
+        disable_inout=(True, True),
+        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+        decode_phase = False,
+        model_name = "GPTJForCausalLM",
+    )
 
-    return QuantPreTrainedModel(model, model_type, input_names, concrete_args)
+    decode_model = model_compressor.create_quantsim_model(
+        decode_model,
+        qformat_path = qformat_path,
+        qparam_path = qparam_path,
+        weight_calib_method=model_script["weight_calib_method"],
+        weight_granularity=model_script["weight_granularity"],
+        weight_dtype=model_script["weight_dtype"],
+        weight_nbits=model_script["weight_nbits"],
+        act_calib_method=model_script["act_calib_method"],
+        act_granularity=model_script["act_granularity"],
+        act_dtype=model_script["act_dtype"],
+        act_nbits=model_script["act_nbits"],
+        qlevel=model_script["qlevel"],
+        target_machine=model_script["target_machine"],
+        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+        dataloader=None,
+        disable_inout=(True, True),
+        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+        decode_phase = True,
+        model_name = "GPTJForCausalLM",
+    )
+
+    
+    #return QuantPreTrainedModel(model, model_type, input_names, concrete_args)
+    quant_models = {
+        "prefill_model": prefill_model,
+        "decode_model": decode_model,
+    }
+    import pdb
+    pdb.set_trace()
+    return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
