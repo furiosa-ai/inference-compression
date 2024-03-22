@@ -39,7 +39,7 @@ def get_input_names_and_concrete_args(model: PreTrainedModel, prefill_mode = Tru
 def custom_symbolic_trace(model: PreTrainedModel, prefill_mode = True, disable_check: bool = False) -> GraphModule:
     
     input_names, concrete_args = get_input_names_and_concrete_args(model, prefill_mode)
-
+    
     if not disable_check:
         check_if_model_is_supported(model)
 
