@@ -53,4 +53,3 @@ def custom_symbolic_trace(model: PreTrainedModel,
     traced.device = model.device
 
     return traced, input_names, concrete_args
-    
