@@ -1,0 +1,15 @@
+act_calib_method: PERCENTILE_ASYM
+act_dtype: bf16
+act_granularity: channel
+act_nbits: 16
+batch_size: 1
+calib_batch_size: 1
+model: bert-large
+model_overwrite: true
+percentile: 99.99
+target_machine: RGDA0
+weight_calib_method: AMAX_SYM
+weight_dtype: int8
+weight_granularity: channel
+weight_nbits: 8
+qlevel: 1 

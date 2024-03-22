@@ -24,6 +24,8 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, os.path.join(os.getcwd(), "..", "..", "lon"))
 from absl import app
 from absl import flags
+from quantization import get_quant_model
+from utils import set_optimization, random_seed
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -50,6 +52,11 @@ def get_args():
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--sut_server', nargs="*", default= ['http://localhost:8000'],
                     help='Address of the server(s) under test.')
+    parser.add_argument("--model_script_path", default="./quantization/model_script/Qlevel4_RGDA0-W8A8KV8-PTQ.yaml", help="")
+    parser.add_argument("--use_mcp", action="store_true", help="use mcp to quantize the model")
+    parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
+    parser.add_argument("--n_calib", type=int,  default=-1)
+    parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
 
     args = parser.parse_args()
     return args
@@ -64,6 +71,9 @@ scenario_map = {
 
 def main():
     args = get_args()
+    
+    set_optimization(args)
+    random_seed()
 
     sut = None
 
@@ -93,7 +103,10 @@ def main():
             sut = get_ray_sut(args)
         else:
             raise ValueError("Unknown backend: {:}".format(args.backend))
-
+    
+    if args.use_mcp:
+        sut.model = get_quant_model(sut, args.model_script_path, args.n_calib, args.recalibrate)
+        
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
     settings.FromConfig(args.mlperf_conf, "bert", args.scenario)
