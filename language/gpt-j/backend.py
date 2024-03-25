@@ -140,7 +140,7 @@ class SUT_base():
 
 
 class SUT_Offline(SUT_base):
-    def __init__(self, model_path, dtype, dataset_path, max_examples,  use_gpu, num_splits, split_idx, model_source):
+    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx, model_source):
         SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx, model_source)
     '''IssueQuery and inference methods implemented in Base class'''
 
