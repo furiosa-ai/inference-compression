@@ -78,8 +78,7 @@ def main():
 
     if args.use_mcp:
         sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.recalibrate)
-    import pdb
-    pdb.set_trace()
+
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
     # Need to update the conf

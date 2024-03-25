@@ -20,6 +20,7 @@ def _define_transform_descriptor_from_model_type(
     from transformers.models.opt.modeling_opt import OPTForCausalLM
     from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
+    from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM as GPTJForCausalLM_furiosa
 
     if_autoscale_postprocessor = not if_autoscale_preprocessor
     transform_descriptor = []
@@ -28,12 +29,13 @@ def _define_transform_descriptor_from_model_type(
         isinstance(model, OPTForCausalLM)
         or isinstance(model, LlamaForCausalLM)
         or isinstance(model, GPTJForCausalLM)
+        or isinstance(model, GPTJForCausalLM_furiosa)
     ):
         if isinstance(model, OPTForCausalLM):
             _model_type = 'OPTForCausalLM'
         elif isinstance(model, LlamaForCausalLM):
             _model_type = 'LlamaForCausalLM'
-        elif isinstance(model, GPTJForCausalLM):
+        elif isinstance(model, GPTJForCausalLM) or isinstance(model, GPTJForCausalLM_furiosa):
             _model_type = 'GPTJForCausalLM'
 
         if if_autoscale_preprocessor:
@@ -158,6 +160,8 @@ def load_predefined_settings(
     from transformers.models.opt.modeling_opt import OPTForCausalLM
     from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
+    from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM as GPTJForCausalLM_furiosa
+    
     preprocessor = []
     postprocessor = []
 
@@ -166,6 +170,7 @@ def load_predefined_settings(
         or isinstance(model, LlamaForCausalLM)
         or isinstance(model, GPTJForCausalLM)
         or isinstance(model, BertForQuestionAnswering)
+        or isinstance(model, GPTJForCausalLM_furiosa)
     ):
         preprocessor.extend(
             _define_transform_descriptor_from_model_type(

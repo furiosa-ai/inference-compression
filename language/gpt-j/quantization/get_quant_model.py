@@ -239,6 +239,5 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         "prefill_model": prefill_model,
         "decode_model": decode_model,
     }
-    import pdb
-    pdb.set_trace()
+
     return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
