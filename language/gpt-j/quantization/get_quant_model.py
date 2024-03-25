@@ -112,19 +112,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     }
 
 
-    # if calib_dataloader is not None and model_script["qlevel"] > 2:
-    #     org_prefill_model = copy.deepcopy(prefill_model)
-    # if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
-    #     calib_dataloader = None
-    #     org_model = None
-    # else:
-    #     calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], model.config.n_layer)
-    #     org_model = model if model_script["qlevel"]>=3 else None
-
-    #    #prepare for autoscale 
-
-  
-
     if calib_dataloader:
         prefill_model_for_calib = copy.deepcopy(prefill_model)
         # Extract necessary parameters to initialize QuantPreTrainedModel
