@@ -84,7 +84,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
     qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
     
-    
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
