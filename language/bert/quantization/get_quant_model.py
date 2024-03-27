@@ -7,6 +7,40 @@ import torch
 from .calib_dataloader import make_dataloader
 #calib_dataset_path
 from transformers.generation.utils import *
+from utils import make_gm_code
+
+import torch._decomp
+from torch.func import functionalize
+from torch.fx.experimental.proxy_tensor import make_fx
+
+
+def std_decompositions():
+    return {
+        **torch._decomp.core_aten_decompositions(),
+        **torch._decomp.get_decompositions(
+            [
+                torch.ops.aten.addmm,
+                torch.ops.aten.gelu,
+                torch.ops.aten.native_layer_norm,
+                torch.ops.aten.split.Tensor,
+                torch.ops.aten.split_with_sizes,
+                torch.ops.aten.embedding,
+                torch.ops.aten._unsafe_view,
+                torch.ops.aten.upsample_nearest2d,
+                torch.ops.aten.clamp_min,
+                torch.ops.aten.clamp_max,
+                torch.ops.aten.relu_,
+                torch.ops.aten.roll,
+                torch.ops.aten.linalg_vector_norm,
+                torch.ops.aten._native_batch_norm_legit,
+                torch.ops.aten._native_batch_norm_legit_no_training,
+                torch.ops.aten.relu,
+                torch.ops.aten.clamp,
+                torch.ops.aten.repeat,
+            ]
+        ),
+    }
+
 
 
 def load_model_script(model_script_path):
@@ -59,7 +93,7 @@ def get_quant_model(sut, model_script_path, n_calib, recalibrate):
         disable_inout=(True,True),
         )
     
-
+    #if False:
     if calib_dataloader:
 
         model_compressor.calibrate(
@@ -115,5 +149,37 @@ def get_quant_model(sut, model_script_path, n_calib, recalibrate):
         )
     
 
+    dummy_batch = next(iter(calib_dataloader))
+    for key in dummy_batch:
+        dummy_batch[key] = dummy_batch[key].cuda()
 
+    with torch.no_grad():
+        quant_model(**dummy_batch)
+
+    quant_model.eval()
+    
+    gm = functionalize(quant_model, remove='mutations_and_views')
+    gm = make_fx(
+        gm,
+        tracing_mode='real',
+        _allow_non_fake_inputs=True,
+        decomposition_table=std_decompositions(),
+    )(
+        dummy_batch["input_ids"],
+        dummy_batch["attention_mask"],
+        dummy_batch["token_type_ids"],
+    )
+
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    
+    gm = torch.compile(quant_model)
+    output = torch._dynamo.explain(
+        gm,
+        dummy_batch["input_ids"],
+        dummy_batch["attention_mask"],
+        dummy_batch["token_type_ids"],
+        
+    )
+    with open("code_v1.1furiosa.txt", 'w') as fp: fp.write(gm.code) 
     return quant_model
