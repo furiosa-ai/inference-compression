@@ -53,6 +53,7 @@ def get_quant_model(sut, model_script_path, n_calib, recalibrate):
         act_dtype=model_script["act_dtype"],
         act_nbits=model_script["act_nbits"],
         kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
         qlevel=model_script["qlevel"],
         target_machine=model_script["target_machine"],
         dataloader=calib_dataloader,
@@ -74,6 +75,7 @@ def get_quant_model(sut, model_script_path, n_calib, recalibrate):
             act_dtype=model_script["act_dtype"],
             act_nbits=model_script["act_nbits"],
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             percentile=model_script["percentile"],
             target_machine=model_script["target_machine"],
         )
@@ -109,6 +111,7 @@ def get_quant_model(sut, model_script_path, n_calib, recalibrate):
         act_nbits=model_script["act_nbits"],
         kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
         qlevel=model_script["qlevel"],
+        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
         target_machine=model_script["target_machine"],
         dataloader=None,
         disable_inout=(True,True),

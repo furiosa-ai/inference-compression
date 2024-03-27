@@ -13,4 +13,5 @@ weight_dtype: int8
 weight_granularity: channel
 weight_nbits: 8
 kv_dtype: int8
+act_zp_equalizing: linear_all
 qlevel: 4
