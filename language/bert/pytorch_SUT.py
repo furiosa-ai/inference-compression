@@ -26,7 +26,8 @@ import mlperf_loadgen as lg
 import numpy as np
 import torch
 import transformers
-from transformers import BertConfig, BertForQuestionAnswering
+from transformers import BertConfig
+from furiosa_llm_models.models.bert.modeling_bert import BertForQuestionAnswering
 from squad_QSL import get_squad_QSL
 
 class BERT_PyTorch_SUT():
@@ -86,8 +87,6 @@ class BERT_PyTorch_SUT():
                 attention_mask=torch.LongTensor(input_mask).unsqueeze(0).to(self.dev),
                 token_type_ids=torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev))
             if self.version >= '4.0.0':
-                #start_scores = model_output.start_logits
-                #end_scores = model_output.end_logits
                 start_scores = model_output['start_logits']
                 end_scores = model_output['end_logits']
             else:
