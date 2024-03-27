@@ -9,6 +9,10 @@ from .QuantPreTrainedModel import QuantPreTrainedModel
 from .custom_symbolic_trace import custom_symbolic_trace
 from dataset import Dataset
 import copy
+from utils import make_gm_code
+import torch._decomp
+from torch.func import functionalize
+from torch.fx.experimental.proxy_tensor import make_fx
 
 
 
@@ -77,7 +81,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
+def get_quant_model(model, data_object, calib_dataset_path, model_script_path, recalibrate):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
 
@@ -224,5 +228,48 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         "prefill_model": prefill_model,
         "decode_model": decode_model,
     }
+
+    calib_dataloader = make_dummy_dataloader(data_object, model_script['calib_batch_size'], decode_model.config, decode_model.config.use_cache, gen_mode=False)
+
+    dummy_batch = next(iter(calib_dataloader))
+
+    device = next(decode_model.parameters()).device
+    if isinstance(dummy_batch, dict):
+        for key in dummy_batch:
+            if isinstance(dummy_batch[key], torch.Tensor):
+                dummy_batch[key] = dummy_batch[key].to(device)
+            elif isinstance(dummy_batch[key][0], list):  # for kv cache
+                for idx in range(len(dummy_batch[key])):
+                    dummy_batch[key][idx] = [torch.squeeze(elem).to(device) for elem in dummy_batch[key][idx]]
+  
+    with torch.no_grad():
+        decode_model(**dummy_batch)
+
+    decode_model.eval()
+    
+    gm = functionalize(decode_model, remove='mutations_and_views')
+    gm = make_fx(
+        gm,
+        tracing_mode='real',
+        _allow_non_fake_inputs=True,
+    )(
+        dummy_batch["input_ids"],
+        dummy_batch["past_key_values"],
+        dummy_batch["attention_mask"],
+        dummy_batch["position_ids"],
+    )
+
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    
+    gm = torch.compile(decode_model)
+    output = torch._dynamo.explain(
+        gm,
+        dummy_batch["input_ids"],
+        dummy_batch["past_key_values"],
+        dummy_batch["attention_mask"],
+        dummy_batch["position_ids"],
+    )
+    with open("code_v2.0furiosa_gptj.txt", 'w') as fp: fp.write(gm.code) 
 
     return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
