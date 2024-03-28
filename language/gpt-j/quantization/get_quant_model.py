@@ -97,22 +97,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         
     model_type = type(model)
 
-    prefill_model, prefill_input_names, prefill_concrete_args = custom_symbolic_trace(model, prefill_mode = True)
-    decode_model, decode_input_names, decode_concrete_args = custom_symbolic_trace(model, prefill_mode = False)
-    
-    input_names = {
-        "prefill_input_names" : prefill_input_names,
-        "decode_input_names" : decode_input_names,
-    }
-
-    concrete_args = {
-        "prefill_concrete_args": prefill_concrete_args,
-        "decode_concrete_args": decode_concrete_args,
-    }
-
-
     if calib_dataloader:
-        prefill_model_for_calib = copy.deepcopy(prefill_model)
+        prefill_model_for_calib, _, _ = custom_symbolic_trace(model, prefill_mode = True)
         # Extract necessary parameters to initialize QuantPreTrainedModel
         prefill_model_for_calib = model_compressor.create_quantsim_model(
             prefill_model_for_calib,
@@ -173,7 +159,19 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         del prefill_model_for_calib
 
 
+    prefill_model, prefill_input_names, prefill_concrete_args = custom_symbolic_trace(model, prefill_mode = True)
+    decode_model, decode_input_names, decode_concrete_args = custom_symbolic_trace(model, prefill_mode = False)
     
+    input_names = {
+        "prefill_input_names" : prefill_input_names,
+        "decode_input_names" : decode_input_names,
+    }
+
+    concrete_args = {
+        "prefill_concrete_args": prefill_concrete_args,
+        "decode_concrete_args": decode_concrete_args,
+    }
+
     prefill_model = model_compressor.create_quantsim_model(
         prefill_model,
         qformat_path = qformat_path,
