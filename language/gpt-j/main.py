@@ -47,7 +47,7 @@ def get_args():
     parser.add_argument("--num_splits", type=int, default=1, help="")
     parser.add_argument("--split_idx", type=int, default=0, help="")
     parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
-    parser.add_argument("--model_source", type = str, default = "transformers", help="the type of GPTJForCausalLM to use")
+    parser.add_argument("--model_source", type = str, default = "furiosa_llm_original", help="the type of GPTJForCausalLM to use")
     args = parser.parse_args()
     return args
 

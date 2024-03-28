@@ -42,10 +42,13 @@ class SUT_base():
         if model_source == 'transformers':
             model_cls = AutoModelForCausalLM
         elif model_source == 'furiosa_llm_original':
-            from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM
+            from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM 
             model_cls = GPTJForCausalLM
-        elif model_source == 'furiosa_llm_paged_attention':
-            from furiosa_llm_models.models.gptj.modeling_gptj_paged_attention_concat import GPTJForCausalLM
+        elif model_source == 'paged_attention_concat':
+            from furiosa_llm_models.gptj.paged_attention_concat import GPTJForCausalLM 
+            model_cls = GPTJForCausalLM
+        elif model_source == 'furiosa_llm_rope':
+            from furiosa_llm_models.models.gptj.huggingface_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM
         
         self.model = model_cls.from_pretrained(
