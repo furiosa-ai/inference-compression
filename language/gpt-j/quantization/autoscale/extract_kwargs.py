@@ -12,7 +12,7 @@ from transformers.models.bloom.modeling_bloom import BloomBlock, BloomForCausalL
 from transformers.models.llama.modeling_llama import LlamaAttention, LlamaForCausalLM
 from transformers.models.opt.modeling_opt import OPTAttention, OPTForCausalLM
 from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJForCausalLM
-from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM as GPTJForCausalLM_furiosa
+from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
 from transformers.models.bert.modeling_bert import BertForQuestionAnswering
 
 __all__ = ["get_autoscale_calib_cfg", "valid_check_calib_cfg"]

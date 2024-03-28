@@ -4,9 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers.utils.fx import symbolic_trace
 import model_compressor
-from typing import Optional
-from .QuantPreTrainedModel import QuantPreTrainedModel
-from .custom_symbolic_trace import custom_symbolic_trace
+from typing import Optional 
 from dataset import Dataset
 import copy
 
@@ -21,23 +19,7 @@ gen_kwargs = {
     "num_beams": int(os.environ.get("GPTJ_BEAM_SIZE", "4")),
 }
 
-##To Do: the above function will be fixed later for calibration. 
-def make_dummy_dataloader(data_object, batch_size, model_config, use_cache=False, gen_mode=False): 
-    data_list = []
-    for idx in range(len(data_object.source_encoded_input_ids)):
-        if use_cache == False and gen_mode == False:
-            data_list.append({'input_ids': data_object.source_encoded_input_ids[idx], 'attention_mask': data_object.source_encoded_attn_masks[idx], 'position_ids': torch.arange(
-                len(data_object.source_encoded_input_ids[idx][0]))})
-        elif use_cache == True and gen_mode == True:
-            data_list.append({'input_ids': data_object.source_encoded_input_ids[idx][0, -1].reshape(1, 1), 'past_key_values': get_dummy_kv_cache(data_object.source_encoded_input_ids[idx], model_config), 'attention_mask': torch.ones(
-                len(data_object.source_encoded_input_ids[0][0])+1).unsqueeze(0).type(torch.int), 'position_ids': torch.tensor(len(data_object.source_encoded_input_ids[idx][0])).reshape(1, 1)})
-        elif use_cache == True and gen_mode == False:
-            data_list.append({'input_ids': data_object.source_encoded_input_ids[idx][0, -1].reshape(1, 1).repeat(gen_kwargs["num_beams"], 1), 'past_key_values': get_dummy_kv_cache(data_object.source_encoded_input_ids[idx], model_config), 'attention_mask': torch.ones(
-                len(data_object.source_encoded_input_ids[0][0])+1).unsqueeze(0).repeat(gen_kwargs["num_beams"], 1).type(torch.int), 'position_ids': torch.tensor(len(data_object.source_encoded_input_ids[idx][0])).reshape(1, 1).repeat(gen_kwargs["num_beams"], 1)})
-        elif use_cache == False and gen_mode == True:
-            raise ValueError(
-                "Not implemented yet. Will implement when need arises.")
-    return DataLoader(data_list, batch_size)
+
 
 def make_calib_dataloader(calib_dataset_path, batch_size):
     data_object = Dataset(calib_dataset_path, batch_size)
@@ -48,21 +30,12 @@ def make_calib_dataloader(calib_dataset_path, batch_size):
     return DataLoader(data_list, batch_size)
 
 
-
 def load_model_script(model_script_path):
     with open(model_script_path, 'r') as f:
         model_script = yaml.safe_load(f)
 
     return model_script
 
-
-def get_dummy_kv_cache(input_ids, model_config):
-    kv_cache = list(range(model_config.n_layer))
-    for idx in range(len(kv_cache)):
-        kv_cache[idx] = [torch.randn(gen_kwargs["num_beams"], model_config.n_head, len(
-            input_ids[0]), int(model_config.n_embd/model_config.n_head)) for _ in range(2)]
-
-    return list(kv_cache)
 
 def get_autoscale_calib_config(model_script, model, calib_dataloader):
     from .autoscale import extract_kwargs 
@@ -98,7 +71,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     model_type = type(model)
 
     if calib_dataloader:
-        prefill_model_for_calib, _, _ = custom_symbolic_trace(model, prefill_mode = True)
+        prefill_model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
         # Extract necessary parameters to initialize QuantPreTrainedModel
         prefill_model_for_calib = model_compressor.create_quantsim_model(
             prefill_model_for_calib,
@@ -159,8 +132,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         del prefill_model_for_calib
 
 
-    prefill_model, prefill_input_names, prefill_concrete_args = custom_symbolic_trace(model, prefill_mode = True)
-    decode_model, decode_input_names, decode_concrete_args = custom_symbolic_trace(model, prefill_mode = False)
+    prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
+    decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
     
     input_names = {
         "prefill_input_names" : prefill_input_names,
@@ -216,8 +189,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         model_name = "GPTJForCausalLM",
     )
 
-    
-    #return QuantPreTrainedModel(model, model_type, input_names, concrete_args)
     quant_models = {
         "prefill_model": prefill_model,
         "decode_model": decode_model,

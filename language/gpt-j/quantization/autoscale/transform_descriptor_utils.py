@@ -20,7 +20,7 @@ def _define_transform_descriptor_from_model_type(
     from transformers.models.opt.modeling_opt import OPTForCausalLM
     from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
-    from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM as GPTJForCausalLM_furiosa
+    from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
 
     if_autoscale_postprocessor = not if_autoscale_preprocessor
     transform_descriptor = []
@@ -160,7 +160,7 @@ def load_predefined_settings(
     from transformers.models.opt.modeling_opt import OPTForCausalLM
     from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
-    from furiosa_llm_models.models.gptj.modeling_gptj import GPTJForCausalLM as GPTJForCausalLM_furiosa
+    from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
     
     preprocessor = []
     postprocessor = []
