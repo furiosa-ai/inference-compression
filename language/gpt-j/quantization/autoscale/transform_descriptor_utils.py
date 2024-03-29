@@ -21,6 +21,7 @@ def _define_transform_descriptor_from_model_type(
     from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
     from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
+    from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM as GPTJForCausalLM_rope
 
     if_autoscale_postprocessor = not if_autoscale_preprocessor
     transform_descriptor = []
@@ -30,6 +31,7 @@ def _define_transform_descriptor_from_model_type(
         or isinstance(model, LlamaForCausalLM)
         or isinstance(model, GPTJForCausalLM)
         or isinstance(model, GPTJForCausalLM_furiosa)
+        or isinstance(model, GPTJForCausalLM_rope)
     ):
         if isinstance(model, OPTForCausalLM):
             _model_type = 'OPTForCausalLM'
@@ -37,6 +39,8 @@ def _define_transform_descriptor_from_model_type(
             _model_type = 'LlamaForCausalLM'
         elif isinstance(model, GPTJForCausalLM) or isinstance(model, GPTJForCausalLM_furiosa):
             _model_type = 'GPTJForCausalLM'
+        elif isinstance(model, GPTJForCausalLM) or isinstance(model, GPTJForCausalLM_rope):
+            _model_type = 'GPTJForCausalLM_rope'
 
         if if_autoscale_preprocessor:
             transform_descriptor.extend(
@@ -161,6 +165,7 @@ def load_predefined_settings(
     from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
     from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
+    from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM as GPTJForCausalLM_rope
     
     preprocessor = []
     postprocessor = []
@@ -171,6 +176,7 @@ def load_predefined_settings(
         or isinstance(model, GPTJForCausalLM)
         or isinstance(model, BertForQuestionAnswering)
         or isinstance(model, GPTJForCausalLM_furiosa)
+        or isinstance(model, GPTJForCausalLM_rope)
     ):
         preprocessor.extend(
             _define_transform_descriptor_from_model_type(

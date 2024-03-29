@@ -13,6 +13,7 @@ from transformers.models.llama.modeling_llama import LlamaAttention, LlamaForCau
 from transformers.models.opt.modeling_opt import OPTAttention, OPTForCausalLM
 from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJForCausalLM
 from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
+from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM as GPTJForCausalLM_rope
 from transformers.models.bert.modeling_bert import BertForQuestionAnswering
 
 __all__ = ["get_autoscale_calib_cfg", "valid_check_calib_cfg"]
@@ -77,7 +78,7 @@ def get_autoscale_calib_cfg(
         )
     calib_cfg['nodes_excluded_from_auto_clip_calib'] = args.nodes_excluded_from_auto_clip_calib
 
-    if args.unify_smooth_factor and type(model) not in [GPTJForCausalLM, GPTJForCausalLM_furiosa]:
+    if args.unify_smooth_factor and type(model) not in [GPTJForCausalLM, GPTJForCausalLM_furiosa, GPTJForCausalLM_rope]:
         raise ValueError("Unifying smoothing factor is implemented only for GPT-J at the moment.")
     calib_cfg['unify_smooth_factor'] = args.unify_smooth_factor
     calib_cfg['module_name_to_replace_smooth_factor'] = args.module_name_to_replace_smooth_factor
@@ -173,7 +174,7 @@ def _get_predefined_excluded_from_auto_scale_calib(torch_model, autoscale):
             nodes_list = ["dense"]
         elif autoscale == 'SmoothQuant':
             nodes_list = ['dense', 'dense_4h_to_h']
-    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
+    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa) or isinstance(torch_model, GPTJForCausalLM_rope):
         if autoscale == 'AWQ':
             nodes_list = ["lm_head"]
         elif autoscale == 'SmoothQuant':
@@ -204,7 +205,7 @@ def _get_predefined_excluded_from_auto_clip_calib(torch_model):
         nodes_list = ['q_proj', 'k_proj', 'lm_head']
     elif isinstance(torch_model, BloomForCausalLM):
         nodes_list = ['query_key_value']
-    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
+    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa) or isinstance(torch_model, GPTJForCausalLM_rope):
         nodes_list = ['q_proj', 'k_proj', 'lm_head']
     elif "mpt" in str(torch_model.__class__).lower():
         nodes_list = []
