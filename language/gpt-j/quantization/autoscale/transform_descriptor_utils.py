@@ -167,6 +167,7 @@ def load_predefined_settings(
     if (
         isinstance(model, OPTForCausalLM)
         or isinstance(model, LlamaForCausalLM)
+        or isinstance(model, BertForQuestionAnswering)
         or type(model) in GPTJForCausalLM_dict.keys()
     ):
         preprocessor.extend(
