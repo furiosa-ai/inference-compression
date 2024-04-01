@@ -2,6 +2,9 @@ import json
 import logging
 
 import torch
+import transformers
+import furiosa_llm_models
+from .model_dict import GPTJForCausalLM_dict
 
 __all__ = ["create_descriptor_from_args", "load_predefined_settings"]
 
@@ -18,9 +21,8 @@ def _define_transform_descriptor_from_model_type(
     from transformers.models.bloom.modeling_bloom import BloomForCausalLM
     from transformers.models.llama.modeling_llama import LlamaForCausalLM
     from transformers.models.opt.modeling_opt import OPTForCausalLM
-    from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
-    from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
+
 
     if_autoscale_postprocessor = not if_autoscale_preprocessor
     transform_descriptor = []
@@ -28,14 +30,13 @@ def _define_transform_descriptor_from_model_type(
     if (
         isinstance(model, OPTForCausalLM)
         or isinstance(model, LlamaForCausalLM)
-        or isinstance(model, GPTJForCausalLM)
-        or isinstance(model, GPTJForCausalLM_furiosa)
+        or type(model) in GPTJForCausalLM_dict.keys()
     ):
         if isinstance(model, OPTForCausalLM):
             _model_type = 'OPTForCausalLM'
         elif isinstance(model, LlamaForCausalLM):
             _model_type = 'LlamaForCausalLM'
-        elif isinstance(model, GPTJForCausalLM) or isinstance(model, GPTJForCausalLM_furiosa):
+        elif type(model) in GPTJForCausalLM_dict.keys():
             _model_type = 'GPTJForCausalLM'
 
         if if_autoscale_preprocessor:
@@ -158,9 +159,7 @@ def load_predefined_settings(
     from transformers.models.bloom.modeling_bloom import BloomForCausalLM
     from transformers.models.llama.modeling_llama import LlamaForCausalLM
     from transformers.models.opt.modeling_opt import OPTForCausalLM
-    from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
     from transformers.models.bert.modeling_bert import BertForQuestionAnswering
-    from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
     
     preprocessor = []
     postprocessor = []
@@ -168,9 +167,7 @@ def load_predefined_settings(
     if (
         isinstance(model, OPTForCausalLM)
         or isinstance(model, LlamaForCausalLM)
-        or isinstance(model, GPTJForCausalLM)
-        or isinstance(model, BertForQuestionAnswering)
-        or isinstance(model, GPTJForCausalLM_furiosa)
+        or type(model) in GPTJForCausalLM_dict.keys()
     ):
         preprocessor.extend(
             _define_transform_descriptor_from_model_type(

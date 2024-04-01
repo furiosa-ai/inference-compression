@@ -6,18 +6,19 @@ from typing import Any, Dict
 
 import model_compressor
 import torch
-
+import transformers 
+import furiosa_llm_models
 from . import transform_descriptor_utils
 from transformers.models.bloom.modeling_bloom import BloomBlock, BloomForCausalLM
 from transformers.models.llama.modeling_llama import LlamaAttention, LlamaForCausalLM
 from transformers.models.opt.modeling_opt import OPTAttention, OPTForCausalLM
-from transformers.models.gptj.modeling_gptj import GPTJAttention, GPTJForCausalLM
-from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM as GPTJForCausalLM_furiosa
 from transformers.models.bert.modeling_bert import BertForQuestionAnswering
+from .model_dict import GPTJForCausalLM_dict
 
 __all__ = ["get_autoscale_calib_cfg", "valid_check_calib_cfg"]
 
 logger = logging.getLogger(__name__)
+
 
 
 def get_autoscale_calib_cfg(
@@ -77,7 +78,7 @@ def get_autoscale_calib_cfg(
         )
     calib_cfg['nodes_excluded_from_auto_clip_calib'] = args.nodes_excluded_from_auto_clip_calib
 
-    if args.unify_smooth_factor and type(model) not in [GPTJForCausalLM, GPTJForCausalLM_furiosa]:
+    if args.unify_smooth_factor and type(model) not in GPTJForCausalLM_dict.keys():
         raise ValueError("Unifying smoothing factor is implemented only for GPT-J at the moment.")
     calib_cfg['unify_smooth_factor'] = args.unify_smooth_factor
     calib_cfg['module_name_to_replace_smooth_factor'] = args.module_name_to_replace_smooth_factor
@@ -138,8 +139,8 @@ def _get_predefined_proxy_target_module(torch_model):
         proxy_target_module_type = [BloomBlock]
         layers2inspect = [None, None]
         nodes_using_proxy_target = ['query_key_value', 'h_to_4h']
-    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
-        proxy_target_module_type = [GPTJAttention]
+    elif type(torch_model) in GPTJForCausalLM_dict.keys():
+        proxy_target_module_type = [GPTJForCausalLM_dict[type(torch_model)].GPTJAttention]
         layers2inspect = [['q_proj', 'k_proj', 'v_proj']]
         nodes_using_proxy_target = ['q_proj']
     elif "mpt" in str(torch_model.__class__).lower():
@@ -173,7 +174,7 @@ def _get_predefined_excluded_from_auto_scale_calib(torch_model, autoscale):
             nodes_list = ["dense"]
         elif autoscale == 'SmoothQuant':
             nodes_list = ['dense', 'dense_4h_to_h']
-    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
+    elif type(torch_model) in GPTJForCausalLM_dict.keys():
         if autoscale == 'AWQ':
             nodes_list = ["lm_head"]
         elif autoscale == 'SmoothQuant':
@@ -204,7 +205,7 @@ def _get_predefined_excluded_from_auto_clip_calib(torch_model):
         nodes_list = ['q_proj', 'k_proj', 'lm_head']
     elif isinstance(torch_model, BloomForCausalLM):
         nodes_list = ['query_key_value']
-    elif isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
+    elif type(torch_model) in GPTJForCausalLM_dict.keys():
         nodes_list = ['q_proj', 'k_proj', 'lm_head']
     elif "mpt" in str(torch_model.__class__).lower():
         nodes_list = []
@@ -286,7 +287,7 @@ def _get_blocks(model):
         layers = model.model.decoder.layers
     elif isinstance(model, BloomForCausalLM):
         layers = model.transformer.h
-    elif isinstance(model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
+    elif type(torch_model) in GPTJForCausalLM_dict.keys():
         layers = model.transformer.h
     elif "mpt" in str(model.__class__).lower():
         layers = model.transformer.blocks
@@ -339,7 +340,7 @@ def _extract_layer_kwargs(torch_model, samples, cache_ckpt_folder_path):
             torch_model, model_path
         )
 
-    if isinstance(torch_model, GPTJForCausalLM) or isinstance(torch_model, GPTJForCausalLM_furiosa):
+    if type(torch_model) in GPTJForCausalLM_list:
         layers[0] = Catcher_GPTJ(layers[0])
     else:
         layers[0] = Catcher(layers[0])

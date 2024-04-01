@@ -66,8 +66,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
      #prepare for autoscale 
     if run_autoscale:
         autoscale_calib_cfg = get_autoscale_calib_config(model_script, model, calib_dataloader)
- 
-        
+
+
     model_type = type(model)
 
     if calib_dataloader:
