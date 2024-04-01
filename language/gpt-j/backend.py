@@ -48,7 +48,7 @@ class SUT_base():
             from furiosa_llm_models.gptj.paged_attention_concat import GPTJForCausalLM 
             model_cls = GPTJForCausalLM
         elif model_source == 'furiosa_llm_rope':
-            from furiosa_llm_models.models.gptj.huggingface_rope import GPTJForCausalLM
+            from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM
         
         self.model = model_cls.from_pretrained(
