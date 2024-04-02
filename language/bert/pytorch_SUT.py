@@ -27,7 +27,7 @@ import numpy as np
 import torch
 import transformers
 from transformers import BertConfig
-from furiosa_llm_models.models.bert.modeling_bert import BertForQuestionAnswering
+from furiosa_llm_models.bert.huggingface import BertForQuestionAnswering
 from squad_QSL import get_squad_QSL
 
 class BERT_PyTorch_SUT():
