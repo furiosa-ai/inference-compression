@@ -63,10 +63,10 @@ class SUT_base():
         )
         
         #control the # of layers for exp
-        from transformers import AutoConfig
-        config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
-        config_exp.n_layer = 2
-        self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
+        # from transformers import AutoConfig
+        # config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
+        # config_exp.n_layer = 2
+        # self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
 
 
 
