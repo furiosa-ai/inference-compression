@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers.utils.fx import symbolic_trace
 import model_compressor
+import furiosa_llm_models
 from typing import Optional 
 from dataset import Dataset
 import copy
@@ -19,6 +20,31 @@ gen_kwargs = {
     "num_beams": int(os.environ.get("GPTJ_BEAM_SIZE", "4")),
 }
 
+
+GENERATOR_DICT = {
+    furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
+    furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
+}
+
+def get_total_block_space(config, num_blocks = 512 , block_size = 1, bucket_size =8):
+    block_size = 1
+    bucket_size = 512 #artibrary set to accomodate input prompt & generated summary
+    example_block_per_layer_shape = (
+        num_blocks,
+        block_size,
+        config.n_head,
+        int(config.n_embd / config.n_head),
+    )
+
+    total_block_space = []
+    for _ in range(0, config.n_layer):
+        total_block_space.append(
+            (
+                torch.zeros(example_block_per_layer_shape),  # key
+                torch.zeros(example_block_per_layer_shape),  # value
+            )
+        )
+    return (bucket_size, total_block_space)
 
 
 def make_calib_dataloader(calib_dataset_path, batch_size):
@@ -194,4 +220,10 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         "decode_model": decode_model,
     }
 
-    return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
+    quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
+    
+    if model_type in GENERATOR_DICT.keys():
+        bucket_size, total_block_space = get_total_block_space(prefill_model.config)
+        return GENERATOR_DICT[model_type](quant_causallm, total_block_space, bucket_size)
+    else: 
+        return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
