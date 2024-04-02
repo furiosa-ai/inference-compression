@@ -50,6 +50,10 @@ class SUT_base():
         elif model_source == 'furiosa_llm_rope':
             from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM
+        elif model_source == 'paged_attention_concat_rope':
+            from furiosa_llm_models.gptj.paged_attention_concat_rope import GPTJForCausalLM
+            model_cls = GPTJForCausalLM
+        
         
         self.model = model_cls.from_pretrained(
             self.model_path,
@@ -58,6 +62,15 @@ class SUT_base():
             torch_dtype=self.amp_dtype
         )
         
+        #control the # of layers for exp
+        # from transformers import AutoConfig
+        # config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
+        # config_exp.n_layer = 2
+        # self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
+
+
+
+
 
         # Cast the model to GPU if the flag is set.
         if self.use_gpu:
@@ -114,13 +127,19 @@ class SUT_base():
     def inference_call(self, input_ids_tensor, input_masks_tensor):
         ''' Common for all scenarios '''
         torch_device_type = 'cuda' if self.use_gpu else 'cpu'
-
+        input_batch = dict()
+        input_batch['input_ids'] = input_ids_tensor
+        input_batch['attention_mask'] = input_masks_tensor
+        # output_batch = self.model.generate(
+        #     **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
+        output_batch = self.model.generate(input_batch, max_length = len(input_ids_tensor[0])*2, eos_token_id = self.tokenizer.eos_token_id) 
         with torch.inference_mode(), torch.autocast(device_type=torch_device_type, enabled=self.amp_enabled, dtype=self.amp_dtype if self.amp_enabled else None):
             input_batch = dict()
             input_batch['input_ids'] = input_ids_tensor
             input_batch['attention_mask'] = input_masks_tensor
-            output_batch = self.model.generate(
-                **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
+            # output_batch = self.model.generate(
+            #     **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
+            output_batch = self.model.generate(input_batch, max_length = 7) 
 
             input_batch_lengths = [x.shape[0]
                                    for x in input_batch["input_ids"]]
