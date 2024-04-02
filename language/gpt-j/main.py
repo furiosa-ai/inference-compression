@@ -10,8 +10,6 @@ import time
 from datetime import timedelta
 from utils import set_optimization, random_seed
 
-sys.path.insert(0, os.getcwd())
-
 
 def get_args():
     parser = argparse.ArgumentParser()
