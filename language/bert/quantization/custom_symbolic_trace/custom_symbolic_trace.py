@@ -1,5 +1,5 @@
 from transformers import PreTrainedModel, GPTJForCausalLM
-from furiosa_llm_models.models.bert.modeling_bert import BertForQuestionAnswering
+from furiosa_llm_models.bert.huggingface import BertForQuestionAnswering
 
 from transformers.utils.fx import HFTracer, get_concrete_args, check_if_model_is_supported 
 import torch
