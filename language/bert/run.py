@@ -57,6 +57,7 @@ def get_args():
     parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     parser.add_argument("--n_calib", type=int,  default=-1)
     parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
+    parser.add_argument('--n_layers',default='-1',type=int, help='set the number of layers.',)
 
     args = parser.parse_args()
     return args

@@ -36,6 +36,9 @@ class BERT_PyTorch_SUT():
         with open("bert_config.json") as f:
             config_json = json.load(f)
 
+        if args.n_layers > 0:
+            config_json["num_hidden_layers"] = args.n_layers
+
         config = BertConfig(
             attention_probs_dropout_prob=config_json["attention_probs_dropout_prob"],
             hidden_act=config_json["hidden_act"],
