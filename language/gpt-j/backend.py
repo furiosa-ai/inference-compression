@@ -132,7 +132,7 @@ class SUT_base():
         input_batch['attention_mask'] = input_masks_tensor
         # output_batch = self.model.generate(
         #     **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
-        output_batch = self.model.generate(input_batch, max_length = len(input_ids_tensor[0])*2, eos_token_id = self.tokenizer.eos_token_id) 
+        output_batch = self.model.generate(input_batch, max_length = len(input_ids_tensor[0])*2)
         with torch.inference_mode(), torch.autocast(device_type=torch_device_type, enabled=self.amp_enabled, dtype=self.amp_dtype if self.amp_enabled else None):
             input_batch = dict()
             input_batch['input_ids'] = input_ids_tensor
