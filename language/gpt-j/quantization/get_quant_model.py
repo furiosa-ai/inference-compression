@@ -26,14 +26,16 @@ GENERATOR_DICT = {
     furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
 }
 
-def get_total_block_space(config, num_blocks = 512 , block_size = 1, bucket_size = 512):
+def get_total_block_space(config, num_blocks = 32 , block_size = 16, bucket_size = 512):
     #artibrary set to accomodate input prompt & generated summary
+    num_blocks = (1633+100)*2+1
+    block_size = 1 
+    bucket_size = 2048
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
         config.n_head,
-        int(config.n_embd / config.n_head),
-    )
+        int(config.n_embd / config.n_head),    )
 
     total_block_space = []
     for _ in range(0, config.n_layer):
