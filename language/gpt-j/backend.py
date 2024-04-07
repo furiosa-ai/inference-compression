@@ -98,24 +98,40 @@ class SUT_base():
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.data_object = Dataset(
-            self.dataset_path, total_count_override=max_examples, num_splits=num_splits, split_idx=split_idx)
+            self.dataset_path, batch_size=8, total_count_override=max_examples, num_splits=num_splits, split_idx=split_idx)
         self.qsl = lg.ConstructQSL(self.data_object.count, self.data_object.perf_count,
                                    self.data_object.LoadSamplesToRam, self.data_object.UnloadSamplesFromRam)
 
         self.sut = lg.ConstructSUT(self.issue_queries, self.flush_queries)
-
+    
     def issue_queries(self, query_samples):
         print("Number of Samples in query_samples : ", len(query_samples))
 
         total_samples_done = 0
         list_prompts_tokens = []
         list_prompts_attn_masks = []
+        batch_size = 2
+        len_query = len(query_samples)
+        padding_token_id = self.tokenizer.pad_token_id
 
-        for i in range(len(query_samples)):
-            index = query_samples[i].index
-            input_ids_tensor = self.data_object.source_encoded_input_ids[index]
-            input_masks_tensor = self.data_object.source_encoded_attn_masks[index]
+        for i in range(0, len(query_samples), batch_size):
+            
+            source_list=[]
+         
+            for batch_cnt in range(batch_size):
+                sample_idx = i + batch_cnt
+                if sample_idx >= len_query:
+                    break
+ 
+                index = query_samples[sample_idx].index
+                source_list.append(self.data_object.sources[index])
 
+            source_encoded = self.tokenizer(source_list, return_tensors="pt",
+                                            padding=True, truncation=True,
+                                            max_length=1919)
+
+            input_ids_tensor = source_encoded['input_ids']
+            input_masks_tensor = source_encoded['attention_mask']
             # Cast to GPU
             if self.use_gpu:
                 input_ids_tensor = input_ids_tensor.to(self.device)
@@ -123,14 +139,20 @@ class SUT_base():
 
             pred_output_batch = self.inference_call(
                 input_ids_tensor, input_masks_tensor).cpu().numpy()
-            
-            response_array = array.array("B", pred_output_batch[0].tobytes())
-            bi = response_array.buffer_info()
-            response = [lg.QuerySampleResponse(
-                query_samples[i].id, bi[0], bi[1])]
-            lg.QuerySamplesComplete(response)
+
+            for batch_cnt in range(batch_size):
+                sample_idx = i + batch_cnt
+                if sample_idx >= len_query:
+                    break
+                response_array = array.array("B", pred_output_batch[batch_cnt].tobytes())
+                bi = response_array.buffer_info()
+                response = [lg.QuerySampleResponse(
+                    query_samples[sample_idx].id, bi[0], bi[1])]
+                lg.QuerySamplesComplete(response)
             if i % 5 == 0:
                 print("Completed : ", i)
+
+            
 
     def inference_call(self, input_ids_tensor, input_masks_tensor):
         ''' Common for all scenarios '''

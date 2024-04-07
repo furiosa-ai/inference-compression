@@ -56,7 +56,7 @@ class Dataset():
         self.targets = [
             f"{example['output']}" for example in self.list_data_dict]
 
-        self.source_encoded_input_ids, self.source_encoded_attn_masks = self.encode_samples()
+        #self.source_encoded_input_ids, self.source_encoded_attn_masks = self.encode_samples()
 
         self.count = total_count_override or len(self.sources)
         self.perf_count = perf_count_override or self.count
