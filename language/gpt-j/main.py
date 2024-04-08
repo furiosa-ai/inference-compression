@@ -46,6 +46,8 @@ def get_args():
     parser.add_argument("--split_idx", type=int, default=0, help="")
     parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
     parser.add_argument("--model_source", type = str, default = "furiosa_llm_original", help="the type of GPTJForCausalLM to use")
+    parser.add_argument('--n_layers',default='-1',type=int, help='set the number of layers.',)
+    
     args = parser.parse_args()
     return args
 
@@ -72,6 +74,7 @@ def main():
         num_splits=args.num_splits,
         split_idx=args.split_idx,
         model_source = args.model_source,
+        num_layers = args.n_layers, 
     )
 
     if args.use_mcp:

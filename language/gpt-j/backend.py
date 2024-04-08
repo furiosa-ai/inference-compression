@@ -20,13 +20,14 @@ gen_kwargs = {
 
 
 class SUT_base():
-    def __init__(self, model_path, dtype, dataset_path, max_examples, model_source, use_gpu=False, num_splits=1, split_idx=0):
+    def __init__(self, model_path, dtype, dataset_path, max_examples, model_source, num_layers, use_gpu=False, num_splits=1, split_idx=0):
         # TODO : Pass model file name to init instead of args
         print("Loading PyTorch model...")
         self.model_name = "EleutherAI/gpt-j-6B"
         self.dataset_path = dataset_path
         self.model_path = model_path
         self.use_gpu = use_gpu
+
         # dtype
         if dtype == 'bfloat16':
             self.amp_enabled = True
@@ -38,39 +39,40 @@ class SUT_base():
         else:
             self.amp_enabled = False
             self.amp_dtype = torch.float32
+
             
         if model_source == 'transformers':
             model_cls = AutoModelForCausalLM
+            self.gen_source  = 'GenerationMixin'
         elif model_source == 'furiosa_llm_original':
             from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM 
             model_cls = GPTJForCausalLM
+            self.gen_source  = 'GenerationMixin'
         elif model_source == 'paged_attention_concat':
             from furiosa_llm_models.gptj.paged_attention_concat import GPTJForCausalLM 
             model_cls = GPTJForCausalLM
+            self.gen_source  = 'QuantPagedAttentionGenerator'
         elif model_source == 'furiosa_llm_rope':
             from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM
+            self.gen_source = 'GenerationMixin'
         elif model_source == 'paged_attention_concat_rope':
             from furiosa_llm_models.gptj.paged_attention_concat_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM
+            self.gen_source  = 'QuantPagedAttentionGenerator'
         
-        
-        # self.model = model_cls.from_pretrained(
-        #     self.model_path,
-        #     device_map="auto" if not self.use_gpu else None,
-        #     low_cpu_mem_usage=True if not self.use_gpu else False,
-        #     torch_dtype=self.amp_dtype
-        # )
-        
-        #control the # of layers for exp
-        from transformers import AutoConfig
-        config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
-        config_exp.n_layer = 2
-        self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
-
-
-
-
+        if num_layers > 0:
+            from transformers import AutoConfig
+            config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
+            config_exp.n_layer = 2
+            self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
+        else:
+            self.model = model_cls.from_pretrained(
+                self.model_path,
+                device_map="auto" if not self.use_gpu else None,
+                low_cpu_mem_usage=True if not self.use_gpu else False,
+                torch_dtype=self.amp_dtype
+            )
 
         # Cast the model to GPU if the flag is set.
         if self.use_gpu:
@@ -115,6 +117,8 @@ class SUT_base():
 
             pred_output_batch = self.inference_call(
                 input_ids_tensor, input_masks_tensor).cpu().numpy()
+            
+            print(f"{i}-th samples are completed")
 
             response_array = array.array("B", pred_output_batch[0].tobytes())
             bi = response_array.buffer_info()
@@ -127,20 +131,17 @@ class SUT_base():
     def inference_call(self, input_ids_tensor, input_masks_tensor):
         ''' Common for all scenarios '''
         torch_device_type = 'cuda' if self.use_gpu else 'cpu'
-        input_batch = dict()
-        input_batch['input_ids'] = input_ids_tensor
-        input_batch['attention_mask'] = input_masks_tensor
-        # output_batch = self.model.generate(
-        #     **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
-        output_batch = self.model.generate(input_batch, max_length = 1633+100, pad_token_id = self.tokenizer.pad_token_id, eos_token_id = self.model.model.prefill_model.config.eos_token_id)
-        #output_batch = self.model.generate(input_batch, max_length = 1633+32)
         with torch.inference_mode(), torch.autocast(device_type=torch_device_type, enabled=self.amp_enabled, dtype=self.amp_dtype if self.amp_enabled else None):
             input_batch = dict()
             input_batch['input_ids'] = input_ids_tensor
             input_batch['attention_mask'] = input_masks_tensor
-            output_batch = self.model.generate(
-                 **input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
-            
+
+            # To Do: Implement beam seach for paged attention & preallocated generator
+            if self.gen_source == 'GenerationMixin':
+                output_batch = self.model.generate(**input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
+            elif self.gen_source == 'QuantPagedAttentionGenerator':
+                output_batch = self.model.generate(input_batch, pad_token_id = self.tokenizer.pad_token_id, eos_token_id = self.model.model.prefill_model.config.eos_token_id)
+
             input_batch_lengths = [x.shape[0]
                                    for x in input_batch["input_ids"]]
 
@@ -152,6 +153,7 @@ class SUT_base():
 
             output_batch_truncated = torch.stack(output_batch_truncated)
 
+
         return output_batch_truncated
 
     def flush_queries(self):
@@ -162,8 +164,8 @@ class SUT_base():
 
 
 class SUT_Offline(SUT_base):
-    def __init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx, model_source):
-        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, use_gpu, num_splits, split_idx, model_source)
+    def __init__(self, model_path, dtype, dataset_path, max_examples, num_layers, use_gpu, num_splits, split_idx, model_source):
+        SUT_base.__init__(self, model_path, dtype, dataset_path, max_examples, num_layers, use_gpu, num_splits, split_idx, model_source)
     '''IssueQuery and inference methods implemented in Base class'''
 
 
@@ -224,9 +226,9 @@ class SUT_SingleStream(SUT_base):
             print("Completed : ", self.total_samples_done)
 
 
-def get_SUT(model_path, scenario, dtype, dataset_path, max_examples, model_source, use_gpu=False, num_splits=1, split_idx=0):
+def get_SUT(model_path, scenario, dtype, dataset_path, max_examples, model_source, num_layers, use_gpu=False, num_splits=1, split_idx=0):
     if scenario == "Offline":
-        return SUT_Offline(model_path, dtype, dataset_path, max_examples, model_source, use_gpu, num_splits, split_idx)
+        return SUT_Offline(model_path, dtype, dataset_path, max_examples, model_source, num_layers, use_gpu, num_splits, split_idx)
     elif scenario == "Server":
         return SUT_Server(model_path, dtype, dataset_path, max_examples, model_source, use_gpu)
     elif scenario == "SingleStream":
