@@ -145,6 +145,8 @@ class SUT_base():
                 output_batch = self.model.generate(**input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
             elif self.gen_source == 'QuantPagedAttentionGenerator':
                 output_batch = self.model.generate(input_batch, pad_token_id = self.tokenizer.pad_token_id, eos_token_id = self.model.model.prefill_model.config.eos_token_id)
+            elif self.gen_source == 'QuantPreAllocatedGenerator':
+                output_batch = self.model.generate(input_batch)
 
             input_batch_lengths = [x.shape[0]
                                    for x in input_batch["input_ids"]]

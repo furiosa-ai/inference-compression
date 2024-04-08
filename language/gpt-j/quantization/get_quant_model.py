@@ -24,7 +24,7 @@ gen_kwargs = {
 GENERATOR_DICT = {
     furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
-    furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.PreAllocatedConcatGenerator,
+    furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator,
 }
 
 def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size = 2048):
@@ -223,7 +223,11 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
     
     if model_type in GENERATOR_DICT.keys():
-        bucket_size, total_block_space = get_total_block_space(prefill_model.config)
-        return GENERATOR_DICT[model_type](quant_causallm, total_block_space, bucket_size)
+        generator = GENERATOR_DICT[model_type]
+        if generator == furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator:
+            return generator(quant_causallm, bucket_size = 2048)
+        else:
+            bucket_size, total_block_space = get_total_block_space(prefill_model.config)
+            return generator(quant_causallm, total_block_space, bucket_size)
     else: 
         return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
