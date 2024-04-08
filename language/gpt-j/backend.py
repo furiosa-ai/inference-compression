@@ -64,7 +64,7 @@ class SUT_base():
         if num_layers > 0:
             from transformers import AutoConfig
             config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
-            config_exp.n_layer = 2
+            config_exp.n_layer = num_layers
             self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
         else:
             self.model = model_cls.from_pretrained(
@@ -118,8 +118,6 @@ class SUT_base():
             pred_output_batch = self.inference_call(
                 input_ids_tensor, input_masks_tensor).cpu().numpy()
             
-            print(f"{i}-th samples are completed")
-
             response_array = array.array("B", pred_output_batch[0].tobytes())
             bi = response_array.buffer_info()
             response = [lg.QuerySampleResponse(
