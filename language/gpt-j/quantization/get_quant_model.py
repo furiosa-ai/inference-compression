@@ -24,6 +24,7 @@ gen_kwargs = {
 GENERATOR_DICT = {
     furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
+    furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.PreAllocatedConcatGenerator,
 }
 
 def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size = 2048):
