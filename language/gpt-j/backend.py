@@ -59,25 +59,24 @@ class SUT_base():
         elif model_source == 'paged_attention_concat_rope':
             from furiosa_llm_models.gptj.paged_attention_concat_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM
+            self.gen_source  = 'QuantPagedAttentionGenerator'
         elif model_source == 'preallocated_concat_rope':
             from furiosa_llm_models.gptj.preallocated_concat_rope import GPTJForCausalLM
             model_cls = GPTJForCausalLM 
+            self.gen_source = 'QuantPreAllocatedGenerator'
         
-        
-        self.model = model_cls.from_pretrained(
-            self.model_path,
-            device_map="auto" if not self.use_gpu else None,
-            low_cpu_mem_usage=True if not self.use_gpu else False,
-            torch_dtype=self.amp_dtype
-        )
-        
-        #control the # of layers for exp
-        # from transformers import AutoConfig
-        # config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
-        # config_exp.n_layer = 2
-        # self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
-
-
+        if num_layers > 0:
+            from transformers import AutoConfig
+            config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
+            config_exp.n_layer = num_layers
+            self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
+        else:
+            self.model = model_cls.from_pretrained(
+                self.model_path,
+                device_map="auto" if not self.use_gpu else None,
+                low_cpu_mem_usage=True if not self.use_gpu else False,
+                torch_dtype=self.amp_dtype
+            )
 
 
 
