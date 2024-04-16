@@ -1,7 +1,6 @@
 import yaml
 import os
 import torch
-from torch.utils.data import DataLoader
 from transformers.utils.fx import symbolic_trace
 import model_compressor
 import furiosa_llm_models
@@ -25,11 +24,13 @@ GENERATOR_DICT = {
     furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator,
+   # furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_generator.QuantPagedAttentionGenerator,
+
 }
 
 def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size = 2048):
     #artibrary set to accomodate input prompt & generated summary
-    num_blocks = ((1633)*2+1)*10
+    num_blocks = ((1633)*2+1)*1
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
@@ -46,14 +47,6 @@ def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size 
         )
     return (bucket_size, total_block_space)
 
-
-def make_calib_dataloader(calib_dataset_path, batch_size):
-    data_object = Dataset(calib_dataset_path, batch_size)
-    data_list = []
-    for idx in range(len(data_object.source_encoded_input_ids)):
-        data_list.append({'input_ids': data_object.source_encoded_input_ids[idx], 'attention_mask': data_object.source_encoded_attn_masks[idx], 'position_ids': torch.arange(
-                len(data_object.source_encoded_input_ids[idx][0]))})
-    return DataLoader(data_list, batch_size)
 
 
 def load_model_script(model_script_path):
@@ -86,7 +79,17 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
-        calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'])
+        if type(model) == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
+            from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
+            bucket_size, total_block_space = get_total_block_space(model.config)
+            calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
+        
+        # elif type(model) == furiosa_llm_models.gptj.paged_attention_rope
+        
+        else:
+            from .calibration_utils.make_calib_dataloader import make_calib_dataloader
+            calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'])
+            
   
     run_autoscale = model_script.get("autoscale", 'disabled') != 'disabled'  
      #prepare for autoscale 
@@ -96,11 +99,57 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
     model_type = type(model)
 
+
+
+
+    #test code
+    # device = next(model.parameters()).device
+    # dummy_batch = next(iter(calib_dataloader))
+
+    # with torch.no_grad():
+    #     if isinstance(dummy_batch, dict):
+    #             for key in dummy_batch:
+    #                 if isinstance(dummy_batch[key], torch.Tensor):
+    #                     dummy_batch[key] = dummy_batch[key].to(device)
+    #                 elif isinstance(dummy_batch[key], list) and isinstance(dummy_batch[key][0], torch.Tensor):
+    #                     for idx in range(len(dummy_batch[key])):
+    #                             dummy_batch[key][idx] = dummy_batch[key][idx].squeeze(0).to(device)
+    #                 elif isinstance(dummy_batch[key], list) and isinstance(dummy_batch[key][0], list):
+    #                     for type_idx in range(len(dummy_batch[key])):
+    #                         for block_idx in range(len(dummy_batch[key][type_idx])): 
+    #                             dummy_batch[key][type_idx][block_idx] = dummy_batch[key][type_idx][block_idx].squeeze(0).to(device)
+
+    #             model(**dummy_batch)
+
+    # data_object = Dataset(calib_dataset_path, 1)
+    # data_list = []
+    # for idx in range(len(data_object.source_encoded_input_ids)):
+    #     data_list.append({'input_ids': data_object.source_encoded_input_ids[idx], 'attention_mask': data_object.source_encoded_attn_masks[idx], 'position_ids': torch.arange(
+    #             len(data_object.source_encoded_input_ids[idx][0]))})
+
+
+    # # def backend():
+    # #     from .dynamo import trace_utils
+    # #     return trace_utils.Mybackend()
+
+
+    # # 
+    # # bucket_size, total_block_space = get_total_block_space(prefill_model.config)
+    # # graph = torch.compile(model, backend = backend, fullgraph=True, dynamic = False)
+
+    # #test code 
+    # _, total_block_space = get_total_block_space(model.config)
+    # graph = torch.export.export(model, data_list[0])
+
     if calib_dataloader:
-        prefill_model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
+        if type(model) == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
+            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
+        else:
+            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
+
         # Extract necessary parameters to initialize QuantPreTrainedModel
-        prefill_model_for_calib = model_compressor.create_quantsim_model(
-            prefill_model_for_calib,
+        model_for_calib = model_compressor.create_quantsim_model(
+            model_for_calib,
             qformat_path = None,
             qparam_path = None,
             weight_calib_method=model_script["weight_calib_method"],
@@ -120,7 +169,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         )
 
         model_compressor.calibrate(
-            model=prefill_model_for_calib,
+            model=model_for_calib,
             model_name=model_script["model"],
             calib_dataloader=calib_dataloader,
             weight_calib_method=model_script["weight_calib_method"],
@@ -140,7 +189,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         )
 
         model_compressor.save(
-                prefill_model_for_calib,
+                model_for_calib,
                 qparam_out_path=qparam_path,
                 qformat_out_path=qformat_path,
                 weight_calib_method=model_script["weight_calib_method"],
@@ -156,9 +205,9 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             )
 
 
-        del prefill_model_for_calib
+        del model_for_calib
 
-
+    
     prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
     decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
     
