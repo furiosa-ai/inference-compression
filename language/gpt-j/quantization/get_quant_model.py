@@ -24,7 +24,7 @@ GENERATOR_DICT = {
     furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator,
-   # furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_generator.QuantPagedAttentionGenerator,
+   #furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_generator.QuantPagedAttentionGenerator,
 
 }
 
@@ -98,48 +98,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
 
     model_type = type(model)
-
-
-
-
-    #test code
-    # device = next(model.parameters()).device
-    # dummy_batch = next(iter(calib_dataloader))
-
-    # with torch.no_grad():
-    #     if isinstance(dummy_batch, dict):
-    #             for key in dummy_batch:
-    #                 if isinstance(dummy_batch[key], torch.Tensor):
-    #                     dummy_batch[key] = dummy_batch[key].to(device)
-    #                 elif isinstance(dummy_batch[key], list) and isinstance(dummy_batch[key][0], torch.Tensor):
-    #                     for idx in range(len(dummy_batch[key])):
-    #                             dummy_batch[key][idx] = dummy_batch[key][idx].squeeze(0).to(device)
-    #                 elif isinstance(dummy_batch[key], list) and isinstance(dummy_batch[key][0], list):
-    #                     for type_idx in range(len(dummy_batch[key])):
-    #                         for block_idx in range(len(dummy_batch[key][type_idx])): 
-    #                             dummy_batch[key][type_idx][block_idx] = dummy_batch[key][type_idx][block_idx].squeeze(0).to(device)
-
-    #             model(**dummy_batch)
-
-    # data_object = Dataset(calib_dataset_path, 1)
-    # data_list = []
-    # for idx in range(len(data_object.source_encoded_input_ids)):
-    #     data_list.append({'input_ids': data_object.source_encoded_input_ids[idx], 'attention_mask': data_object.source_encoded_attn_masks[idx], 'position_ids': torch.arange(
-    #             len(data_object.source_encoded_input_ids[idx][0]))})
-
-
-    # # def backend():
-    # #     from .dynamo import trace_utils
-    # #     return trace_utils.Mybackend()
-
-
-    # # 
-    # # bucket_size, total_block_space = get_total_block_space(prefill_model.config)
-    # # graph = torch.compile(model, backend = backend, fullgraph=True, dynamic = False)
-
-    # #test code 
-    # _, total_block_space = get_total_block_space(model.config)
-    # graph = torch.export.export(model, data_list[0])
 
     if calib_dataloader:
         if type(model) == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
