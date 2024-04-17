@@ -151,7 +151,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
                 act_granularity=model_script["act_granularity"],
                 act_dtype=model_script["act_dtype"],
                 act_nbits=model_script["act_nbits"],
-                #disable_mods=args.disable_quant_list,
+                kv_dtype=model_script["kv_dtype"] if  "kv_dtype" in model_script else 'bf16',
+                disable_inout=(True, True),
             )
 
 
