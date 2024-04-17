@@ -92,6 +92,8 @@ def get_quant_model(sut, model_script_path, n_calib, recalibrate):
             act_granularity=model_script["act_granularity"],
             act_dtype=model_script["act_dtype"],
             act_nbits=model_script["act_nbits"],
+            kv_dtype=model_script["kv_dtype"] if  "kv_dtype" in model_script else 'bf16',
+            disable_inout=(True, True),
         )
 
         quant_model.recompile()
