@@ -165,7 +165,36 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
         del model_for_calib
 
-    
+    if model_type == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
+        #There is no prefill model for paged_attention_rope as past_key_values are always fed to the model
+        decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
+        decode_model = model_compressor.create_quantsim_model(
+            decode_model,
+            qformat_path = qformat_path,
+            qparam_path = qparam_path,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
+            qlevel=model_script["qlevel"],
+            target_machine=model_script["target_machine"],
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            dataloader=None,
+            disable_inout=(True, True),
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+            decode_phase = True,
+            model_name = "GPTJForCausalLM",
+        )
+        
+        #Generator for paged_attention_rope has not been implemented yet 
+        raise NotImplementedError('QuantPagedAttentionGenerator for paged_attention_rope has not been implemented yet')
+
+
+
     prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
     decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
     
@@ -238,6 +267,4 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             bucket_size, total_block_space = get_total_block_space(prefill_model.config)
             return generator(quant_causallm, total_block_space, bucket_size)
     else: 
-        if model_type == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
-            raise NotImplementedError("QuantPagedAttentionGenerator for paged_attention_rope has not been implemented yet")
         return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
