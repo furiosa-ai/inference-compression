@@ -186,7 +186,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-            decode_phase = True,
             model_name = "GPTJForCausalLM",
         )
         
