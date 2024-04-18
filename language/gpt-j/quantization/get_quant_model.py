@@ -238,4 +238,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             bucket_size, total_block_space = get_total_block_space(prefill_model.config)
             return generator(quant_causallm, total_block_space, bucket_size)
     else: 
+        if model_type == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
+            raise NotImplementedError("QuantPagedAttentionGenerator for paged_attention_rope has not been implemented yet")
         return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
