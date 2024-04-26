@@ -20,17 +20,26 @@ gen_kwargs = {
 }
 
 
-GENERATOR_DICT = {
+FURIOSA_GENERATOR_DICT = {
     furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator,
-   #furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_generator.QuantPagedAttentionGenerator,
-
+    furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_generator.QuantPagedAttentionGenerator,
 }
 
-def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size = 2048):
+def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
     #artibrary set to accomodate input prompt & generated summary
-    num_blocks = ((1633)*2+1)*1
+    
+    if kv_dtype == 'float32':
+        block_dtype = torch.float32
+    elif kv_dtype == 'bf16':
+        block_dtype = torch.bfloat16
+    elif kv_dtype == 'int8':
+        block_dtype = torch.int8
+    else:
+        raise NotImplementedError
+    
+    num_blocks = ((1633)*2+1)*5
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
@@ -41,8 +50,8 @@ def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size 
     for _ in range(0, config.n_layer):
         total_block_space.append(
             (
-                torch.zeros(example_block_per_layer_shape),  # key
-                torch.zeros(example_block_per_layer_shape),  # value
+                torch.zeros(example_block_per_layer_shape, dtype = block_dtype),  # key
+                torch.zeros(example_block_per_layer_shape, dtype = block_dtype),  # value
             )
         )
     return (bucket_size, total_block_space)
@@ -81,7 +90,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     else:
         if type(model) == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
             from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
-            bucket_size, total_block_space = get_total_block_space(model.config)
+            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
         
         # elif type(model) == furiosa_llm_models.gptj.paged_attention_rope
@@ -145,7 +154,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             autoscale_calib_method=(model_script["autoscale_calib_method"] if run_autoscale else 'auto'),
             autoscale_calib_kwargs=autoscale_calib_cfg if run_autoscale else None,
         )
-
         model_compressor.save(
                 model_for_calib,
                 qparam_out_path=qparam_path,
@@ -188,82 +196,83 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             model_name = "GPTJForCausalLM",
         )
-        
-        #Generator for paged_attention_rope has not been implemented yet 
-        raise NotImplementedError('QuantPagedAttentionGenerator for paged_attention_rope has not been implemented yet')
+        generator = FURIOSA_GENERATOR_DICT[model_type]
 
+        # only a single graph is  required for paged_attention_rope 
+        bucket_size, total_block_space = get_total_block_space(decode_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
+        return generator(decode_model, model_type, total_block_space, bucket_size) 
 
-
-    prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
-    decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
-    
-    input_names = {
-        "prefill_input_names" : prefill_input_names,
-        "decode_input_names" : decode_input_names,
-    }
-
-    concrete_args = {
-        "prefill_concrete_args": prefill_concrete_args,
-        "decode_concrete_args": decode_concrete_args,
-    }
-
-    prefill_model = model_compressor.create_quantsim_model(
-        prefill_model,
-        qformat_path = qformat_path,
-        qparam_path = qparam_path,
-        weight_calib_method=model_script["weight_calib_method"],
-        weight_granularity=model_script["weight_granularity"],
-        weight_dtype=model_script["weight_dtype"],
-        weight_nbits=model_script["weight_nbits"],
-        act_calib_method=model_script["act_calib_method"],
-        act_granularity=model_script["act_granularity"],
-        act_dtype=model_script["act_dtype"],
-        act_nbits=model_script["act_nbits"],
-        qlevel=model_script["qlevel"],
-        target_machine=model_script["target_machine"],
-        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
-        dataloader=None,
-        disable_inout=(True, True),
-        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-        decode_phase = False,
-        model_name = "GPTJForCausalLM",
-    )
-
-    decode_model = model_compressor.create_quantsim_model(
-        decode_model,
-        qformat_path = qformat_path,
-        qparam_path = qparam_path,
-        weight_calib_method=model_script["weight_calib_method"],
-        weight_granularity=model_script["weight_granularity"],
-        weight_dtype=model_script["weight_dtype"],
-        weight_nbits=model_script["weight_nbits"],
-        act_calib_method=model_script["act_calib_method"],
-        act_granularity=model_script["act_granularity"],
-        act_dtype=model_script["act_dtype"],
-        act_nbits=model_script["act_nbits"],
-        qlevel=model_script["qlevel"],
-        target_machine=model_script["target_machine"],
-        act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
-        dataloader=None,
-        disable_inout=(True, True),
-        kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-        decode_phase = True,
-        model_name = "GPTJForCausalLM",
-    )
-
-    quant_models = {
-        "prefill_model": prefill_model,
-        "decode_model": decode_model,
-    }
-
-    quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
-    
-    if model_type in GENERATOR_DICT.keys():
-        generator = GENERATOR_DICT[model_type]
-        if generator == furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator:
-            return generator(quant_causallm, bucket_size = 2048)
-        else:
-            bucket_size, total_block_space = get_total_block_space(prefill_model.config)
-            return generator(quant_causallm, total_block_space, bucket_size)
     else: 
-        return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
+        prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
+        decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
+
+        input_names = {
+            "prefill_input_names" : prefill_input_names,
+            "decode_input_names" : decode_input_names,
+        }
+
+        concrete_args = {
+            "prefill_concrete_args": prefill_concrete_args,
+            "decode_concrete_args": decode_concrete_args,
+        }
+
+        prefill_model = model_compressor.create_quantsim_model(
+            prefill_model,
+            qformat_path = qformat_path,
+            qparam_path = qparam_path,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
+            qlevel=model_script["qlevel"],
+            target_machine=model_script["target_machine"],
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            dataloader=None,
+            disable_inout=(True, True),
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+            decode_phase = False,
+            model_name = "GPTJForCausalLM",
+        )
+
+        decode_model = model_compressor.create_quantsim_model(
+            decode_model,
+            qformat_path = qformat_path,
+            qparam_path = qparam_path,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
+            qlevel=model_script["qlevel"],
+            target_machine=model_script["target_machine"],
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            dataloader=None,
+            disable_inout=(True, True),
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+            decode_phase = True,
+            model_name = "GPTJForCausalLM",
+        )
+
+        quant_models = {
+            "prefill_model": prefill_model,
+            "decode_model": decode_model,
+        }
+
+        quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
+
+        if model_type in FURIOSA_GENERATOR_DICT.keys():
+            generator = FURIOSA_GENERATOR_DICT[model_type]
+            if generator == furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator:
+                return generator(quant_causallm, bucket_size = 2048)
+            else:
+                bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
+                return generator(quant_causallm, total_block_space, bucket_size)
+        else: 
+            return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
