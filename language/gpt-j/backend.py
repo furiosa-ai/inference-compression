@@ -71,9 +71,9 @@ class SUT_base():
 
         if num_layers > 0:
             from transformers import AutoConfig
-            config_exp =  AutoConfig.from_pretrained('EleutherAI/gpt-j-6B')
+            config_exp =  AutoConfig.from_pretrained(self.model_path)
             config_exp.n_layer = num_layers
-            self.model = model_cls.from_pretrained("EleutherAI/gpt-j-6B", config=config_exp)
+            self.model = model_cls.from_pretrained(self.model_path, config=config_exp)
         else:
             self.model = model_cls.from_pretrained(
                 self.model_path,
