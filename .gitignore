@@ -2,3 +2,6 @@ loadgen/build/
 libmlperf_loadgen.a
 __pycache__/
 generated/
+language/gpt-j/build
+language/gpt-j/quantization/output
+language/gpt-j/model
