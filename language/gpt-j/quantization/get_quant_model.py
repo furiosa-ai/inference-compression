@@ -258,6 +258,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
             model_name = "GPTJForCausalLM",
+            quantized_prefill_model=prefill_model,
         )
 
         quant_models = {
