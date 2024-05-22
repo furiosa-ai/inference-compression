@@ -77,7 +77,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path,weighted_op_emul_dtype, recalibrate):
+def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
 
@@ -196,7 +196,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path,weighted_op_emu
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-            weighted_op_emul_dtype=weighted_op_emul_dtype,
+            delete_org_weight=True,
             model_name = "GPTJForCausalLM",
         )
         generator = FURIOSA_GENERATOR_DICT[model_type]
@@ -238,6 +238,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path,weighted_op_emu
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = False,
+            delete_org_weight=True,
             model_name = "GPTJForCausalLM",
         )
 
@@ -260,6 +261,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path,weighted_op_emu
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
+            delete_org_weight=True,
             model_name = "GPTJForCausalLM",
             quantized_prefill_model=prefill_model,
         )
