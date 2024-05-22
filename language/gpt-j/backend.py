@@ -149,7 +149,7 @@ class SUT_base():
             elif self.gen_source == 'QuantPreAllocatedGenerator':  
                 output_batch = self.model.generate(input_batch, **gen_kwargs)
             elif self.gen_source == 'PagedAttentionPackedGenerator':
-                output_batch = self.model.generate(input_batch, **gen_kwargs)
+                output_batch = self.model.generate(**input_batch, max_length=2048, **gen_kwargs)
             else:
                 raise NotImplementedError
 
