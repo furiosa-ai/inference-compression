@@ -53,6 +53,9 @@ class SUT_base():
             elif model_source == 'furiosa_llm_rope':
                 from furiosa_llm_models.gptj.symbolic.huggingface_rope import GPTJForCausalLM
                 self.gen_source = 'GenerationMixin'
+            elif model_source == 'furiosa_llm_rope_erf':
+                from furiosa_llm_models.gptj.symbolic.huggingface_rope_erfGELU import GPTJForCausalLM
+                self.gen_source = 'GenerationMixin'
             elif model_source == 'paged_attention_rope':
                 from furiosa_llm_models.gptj.symbolic.paged_attention_rope import GPTJForCausalLM
                 self.gen_source  = 'QuantPagedAttentionGenerator'
