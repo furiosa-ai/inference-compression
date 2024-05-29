@@ -97,7 +97,9 @@ class SUT_base():
             padding_side="left",
             use_fast=False,)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-
+        
+        self.model.config.pad_token_id = self.tokenizer.pad_token_id
+        
         self.data_object = Dataset(
             self.dataset_path, total_count_override=max_examples, num_splits=num_splits, split_idx=split_idx)
         self.qsl = lg.ConstructQSL(self.data_object.count, self.data_object.perf_count,
