@@ -1,20 +1,40 @@
 import os
 import torch
 from torch.utils.data import DataLoader
+from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
+from transformers import BertTokenizer
+from torch.nn.functional import pad
 
+def make_packed_calib_data_loader(calib_dataset, bucket_size, pad_token_id):
+    def bucket_pad(tensor):
+        if bucket_size is None:
+            return tensor
 
-class MyCollate:
-    def __call__(self, batch):
+        padding_size = bucket_size - tensor.shape[-1]
+        return pad(tensor, (0, padding_size))
 
-        input_ids = torch.stack([item['input_ids'] for item in batch], dim=0)
-        attention_mask = torch.stack([item['attention_mask'] for item in batch], dim=0)
-        token_type_ids = torch.stack([item['token_type_ids'] for item in batch], dim=0)
+    data_list = []
+    for batch in calib_dataset:
+        input_ids, token_type_ids, attention_mask, position_ids, packed_target_locations = (
+            greedy_attention_packing_bert(
+                input_ids=bucket_pad(batch["input_ids"]),
+                token_type_ids=bucket_pad(batch["token_type_ids"]),
+                bucketized_attention_mask=bucket_pad(batch["attention_mask"]),
+                pad_token_id=pad_token_id,
+            )
+        )
 
-        return {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'token_type_ids': token_type_ids
+        model_inputs = {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
         }
+        data_list.append(model_inputs)
+
+    return DataLoader(data_list)
+
+
 
 def make_dataloader(qsl, batch_size, n_calib):
 

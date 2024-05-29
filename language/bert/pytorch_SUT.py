@@ -27,7 +27,7 @@ import numpy as np
 import torch
 import transformers
 from transformers import BertConfig
-from furiosa_llm_models.bert.huggingface import BertForQuestionAnswering
+
 from squad_QSL import get_squad_QSL
 
 class BERT_PyTorch_SUT():
@@ -55,8 +55,15 @@ class BERT_PyTorch_SUT():
         self.network = args.network
         self.dev = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
         self.version = transformers.__version__
-
+        self.model_source = args.model_source
+        
         print("Loading PyTorch model...")
+        
+        if self.model_source == 'huggingface':
+            from furiosa_llm_models.bert.symbolic.huggingface import BertForQuestionAnswering
+        elif self.model_source == 'unsplit_packed':
+            from furiosa_llm_models.bert.symbolic.huggingface_unsplit_packed import BertForQuestionAnswering
+        
         self.model = BertForQuestionAnswering(config)
         self.model.to(self.dev)
         self.model.eval()
@@ -86,10 +93,55 @@ class BERT_PyTorch_SUT():
             segment_ids = sample_input.segment_ids
 
         with torch.no_grad():
-            model_output = self.model.forward(input_ids=torch.LongTensor(input_ids).unsqueeze(0).to(self.dev),
-                attention_mask=torch.LongTensor(input_mask).unsqueeze(0).to(self.dev),
-                token_type_ids=torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev))
+            if self.model_source == 'huggingface':
+                model_output = self.model.forward(input_ids=torch.LongTensor(input_ids).unsqueeze(0).to(self.dev),
+                    attention_mask=torch.LongTensor(input_mask).unsqueeze(0).to(self.dev),
+                    token_type_ids=torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev))
+            elif self.model_source == 'unsplit_packed':
+                """
+                from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
+                from torch.nn.functional import pad
+
+                padded_sequences={}
+                padded_sequences['input_ids'] = torch.LongTensor(sample_input.input_ids).unsqueeze(0).to(self.dev)
+                padded_sequences['attention_mask'] = torch.LongTensor(sample_input.input_mask).unsqueeze(0).to(self.dev)
+                padded_sequences['token_type_ids'] = torch.LongTensor(sample_input.segment_ids).unsqueeze(0).to(self.dev)
+                def bucket_pad(tensor):
+                    if 512 is None:
+                        return tensor
+
+                    padding_size = 512 - tensor.shape[-1]
+                    return pad(tensor, (0, padding_size))
+                
+                input_ids, token_type_ids, attention_mask, position_ids, packed_target_locations = (
+                    greedy_attention_packing_bert(
+                        input_ids=bucket_pad(padded_sequences["input_ids"]),
+                        token_type_ids=bucket_pad(padded_sequences["token_type_ids"]),
+                        bucketized_attention_mask=bucket_pad(input_ids.shape["attention_mask"]),
+                        pad_token_id=0,
+                    )
+                )
+
+                model_output = self.model(
+                    input_ids=input_ids,
+                    token_type_ids=token_type_ids,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids
+                    )
+                """
+
+                padded_sequences={}
+                padded_sequences['input_ids'] = torch.LongTensor(sample_input.input_ids).unsqueeze(0).to(self.dev)
+                padded_sequences['attention_mask'] = torch.LongTensor(sample_input.input_mask).unsqueeze(0).to(self.dev)
+                padded_sequences['token_type_ids'] = torch.LongTensor(sample_input.segment_ids).unsqueeze(0).to(self.dev)
+                model_output = self.model.generate(
+                        padded_sequences=padded_sequences,
+                        bucket_size=512,
+                        pad_token_id=0,
+                        )
+                
             if self.version >= '4.0.0':
+                import pdb;pdb.set_trace()
                 start_scores = model_output['start_logits']
                 end_scores = model_output['end_logits']
             else:
