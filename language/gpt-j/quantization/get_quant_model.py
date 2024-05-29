@@ -26,7 +26,7 @@ FURIOSA_GENERATOR_DICT = {
     furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch,
 }
 
-def get_total_block_space(config, batch_size = 1, num_blocks = 32 , block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
+def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
     #artibrary set to accomodate input prompt & generated summary
     
     if kv_dtype == 'float32':
