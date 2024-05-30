@@ -115,7 +115,7 @@ class PostProcessArgMax:
 
     def __call__(self, results, ids, expected=None, result_dict=None):
         processed_results = []
-        results = np.argmax(results[0], axis=1)
+        results = np.argmax(results, axis=1)
         n = results.shape[0]
         for idx in range(0, n):
             result = results[idx] + self.offset

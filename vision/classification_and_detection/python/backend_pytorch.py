@@ -7,11 +7,13 @@ https://pytorch.org/docs/stable/onnx.html
 
 from threading import Lock
 
-import caffe2.python.onnx.backend
+#import caffe2.python.onnx.backend
 import onnx
 import torch  # needed to get version and cuda setup
 
 import backend
+
+from torchvision.models import resnet50
 
 
 class BackendPytorch(backend.Backend):
@@ -31,7 +33,11 @@ class BackendPytorch(backend.Backend):
         return "NCHW"
 
     def load(self, model_path, inputs=None, outputs=None):
-        self.model = onnx.load(model_path)
+        self.model = resnet50()
+        state_dict = torch.load(model_path)
+        self.model.load_state_dict(state_dict)
+
+        #self.model = onnx.load(model_path)
 
         # find inputs from the model if not passed in by config
         if inputs:
@@ -54,11 +60,11 @@ class BackendPytorch(backend.Backend):
 
         # prepare the backend
         device = "CUDA:0" if torch.cuda.is_available() else "CPU"
-        self.sess = caffe2.python.onnx.backend.prepare(self.model, device)
+        #self.sess = onnx.backend.prepare(self.model, device)
         return self
 
     def predict(self, feed):
-        self.lock.acquire()
-        res = self.sess.run(feed)
-        self.lock.release()
-        return res
+        # self.lock.acquire()
+        # res = self.sess.run(feed)
+        # self.lock.release()
+        return self.model(torch.Tensor(feed['image'])).detach().numpy()

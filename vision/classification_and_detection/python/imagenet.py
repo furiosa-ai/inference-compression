@@ -35,7 +35,6 @@ class Imagenet(dataset.Dataset):
         self.data_path = data_path
         self.pre_process = pre_process # if None we assume data_path is having preprocessed dataset
         self.use_cache = use_cache
-
         if preprocessed_dir:
             self.cache_dir = preprocessed_dir
         elif pre_process:
