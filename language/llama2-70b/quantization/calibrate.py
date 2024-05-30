@@ -17,11 +17,11 @@ def load_pytorch_model(model_source, model_path, use_gpu, n_layers):
     device = torch.device("cuda:0") if use_gpu else torch.device("cpu")
     amp_dtype = torch.float32
     if model_source == 'furiosa_llm_original':
-        from furiosa_llm_models.llama.huggingface import LlamaForCausalLM 
+        from furiosa_llm_models.llama.symbolic.huggingface import LlamaForCausalLM 
     elif model_source == 'furiosa_llm_rope':
-        from furiosa_llm_models.llama.huggingface_rope import LlamaForCausalLM
+        from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
     elif model_source == 'preallocated_concat_rope':
-        from furiosa_llm_models.llama.preallocated_concat_rope import LlamaForCausalLM
+        from furiosa_llm_models.llama.symbolic.preallocated_concat_rope import LlamaForCausalLM
         
     model_cls = LlamaForCausalLM
     
