@@ -5,6 +5,7 @@ import os
 import logging
 import sys
 from SUT import SUT, SUTServer
+from quantization.utils import random_seed, set_optimization 
 
 sys.path.insert(0, os.getcwd())
 
@@ -18,7 +19,7 @@ def get_args():
     parser.add_argument("--dataset-path", type=str, default=None, help="")
     parser.add_argument("--accuracy", action="store_true", help="Run accuracy mode")
     parser.add_argument("--dtype", type=str, default="float32", help="data type of the model, choose from float16, bfloat16 and float32")
-    parser.add_argument("--device", type=str,  choices=["cpu", "cuda:0"], default="cpu", help="device to use")
+    parser.add_argument("--device", type=str,  choices=["cpu", "cuda:0"], default="cuda:0", help="device to use")
     parser.add_argument("--audit-conf", type=str, default="audit.conf", help="audit config for LoadGen settings during compliance runs")
     parser.add_argument("--mlperf-conf", type=str, default="mlperf.conf", help="mlperf rules config")
     parser.add_argument("--user-conf", type=str, default="user.conf", help="user config for user LoadGen settings such as target QPS")
@@ -26,6 +27,16 @@ def get_args():
     parser.add_argument("--output-log-dir", type=str, default="output-logs", help="Where logs are saved")
     parser.add_argument("--enable-log-trace", action="store_true", help="Enable log tracing. This file can become quite large")
     parser.add_argument("--num-workers", type=int, default=1, help="Number of workers to process queries")
+    
+    parser.add_argument("--model_source", choices=["transformers", "furiosa_llm_original", "furiosa_llm_rope", "preallocated_concat_rope"], default="transformers", help="the type of GPTJForCausalLM to use")
+    parser.add_argument("--quantize", action="store_true", help="quantize model using ModelComPressor(MCP)")
+    parser.add_argument("--quant_config_path", help="a config for model quantization")
+    parser.add_argument("--quant_param_path", help="quantization parameters for calibraed layers")
+    parser.add_argument("--quant_format_path", help="quantization specifications for calibrated layers")
+    parser.add_argument('--torch_numeric_optim', action="store_true", help="use Pytorch numerical optimizaiton for CUDA/cudnn")
+    parser.add_argument("--n_layers", type=int, default=-1, help="Set the number of layers of the model.")
+    parser.add_argument("--weighted_op_emul_dtype", type=str, default="fp32", help="set emulation type of weighted operators")
+
 
     args = parser.parse_args()
     return args
@@ -43,7 +54,10 @@ sut_map = {
 
 def main():
     args = get_args()
-
+    
+    random_seed()
+    set_optimization(args.torch_numeric_optim)
+    
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario.lower()]
     # Need to update the conf
@@ -72,8 +86,14 @@ def main():
         dataset_path=args.dataset_path,
         total_sample_count=args.total_sample_count,
         device=args.device,
+        n_layers=args.n_layers,
     )
-
+    
+    if args.quantize:
+        import quantization 
+        sut.model = quantization.get_quant_model(sut.model, args)
+    
+    
     # Start sut before loadgen starts
     sut.start()
     lgSUT = lg.ConstructSUT(sut.issue_queries, sut.flush_queries)

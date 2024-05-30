@@ -5,7 +5,8 @@ import array
 import torch
 from torch.nn.functional import pad
 from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
 from transformers.generation.streamers import BaseStreamer
 
 import pickle
@@ -86,11 +87,12 @@ class SUT():
                  total_sample_count=24576,
                  dataset_path=None,
                  use_cached_outputs=False,  # Set this to True *only for test accuracy runs* in case your prior session was killed partway through
+                 n_layers=-1,
                  workers=1):
 
         self.model_path = model_path or "meta-llama/Llama-2-70b-chat-hf"
         self.device = device
-
+        self.n_layers = n_layers
         if not batch_size:
             if device == "cpu":
                 batch_size = 1
@@ -228,12 +230,22 @@ class SUT():
 
 
     def load_model(self):
-        self.model = LlamaForCausalLM.from_pretrained(
-            self.model_path,
-            device_map="auto",
-            low_cpu_mem_usage=True,
-            torch_dtype=self.amp_dtype
-        )
+        if self.n_layers > 0:
+            from transformers import AutoConfig
+            config_exp =  AutoConfig.from_pretrained(self.model_path)
+            config_exp.num_hidden_layers = self.n_layers
+            self.model = LlamaForCausalLM.from_pretrained(
+                self.model_path, 
+                device_map="auto",
+                config=config_exp
+                )
+        else:
+            self.model = LlamaForCausalLM.from_pretrained(
+                self.model_path,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                torch_dtype=self.amp_dtype
+            )
         print("Loaded model")
 
         self.device = torch.device(self.device)
