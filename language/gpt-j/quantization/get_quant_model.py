@@ -197,14 +197,13 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             delete_org_weight=True,
-            model_name = "GPTJForCausalLM",
         )
         generator = FURIOSA_GENERATOR_DICT[model_type]
 
         # only a single graph is  required for paged_attention_rope 
         bucket_size, total_block_space = get_total_block_space(decode_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
         return generator(decode_model, model_type, total_block_space, bucket_size) 
-
+    
     else: 
         prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True, disable_check = True)
         decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False, disable_check = True)
@@ -239,7 +238,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = False,
             delete_org_weight=True,
-            model_name = "GPTJForCausalLM",
         )
 
         decode_model = model_compressor.create_quantsim_model(
@@ -262,7 +260,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
             delete_org_weight=True,
-            model_name = "GPTJForCausalLM",
             quantized_prefill_model=prefill_model,
         )
 
