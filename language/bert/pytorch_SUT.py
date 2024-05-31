@@ -141,7 +141,6 @@ class BERT_PyTorch_SUT():
                         )
                 
             if self.version >= '4.0.0':
-                import pdb;pdb.set_trace()
                 start_scores = model_output['start_logits']
                 end_scores = model_output['end_logits']
             else:

@@ -2,7 +2,7 @@ import torch
 from typing import List 
 from torch.utils.data import DataLoader
 from dataset import Dataset
-from furiosa_llm_models.gptj.paged_attention_utils import InputMetadata
+from furiosa_llm_models.gptj.symbolic.paged_attention_utils import InputMetadata
 
 __all__ = ["make_calib_dataloader_for_paged_attention"]
 
