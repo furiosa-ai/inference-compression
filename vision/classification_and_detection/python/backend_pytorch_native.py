@@ -5,7 +5,7 @@ pytoch native backend
 import torch  # currently supports pytorch1.0
 import torchvision
 import backend
-
+from torchvision.models import resnet50
 
 class BackendPytorchNative(backend.Backend):
     def __init__(self):
@@ -24,7 +24,9 @@ class BackendPytorchNative(backend.Backend):
         return "NCHW"
 
     def load(self, model_path, inputs=None, outputs=None):
-        self.model = torch.load(model_path)
+        self.model = resnet50()
+        state_dict = torch.load(model_path)
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         # find inputs from the model if not passed in by config
         if inputs:

@@ -67,4 +67,9 @@ class BackendPytorch(backend.Backend):
         # self.lock.acquire()
         # res = self.sess.run(feed)
         # self.lock.release()
+        
         return self.model(torch.Tensor(feed['image'])).detach().numpy()
+    
+        # device = torch.device("cuda")
+        # self.model.to(device)
+        # return self.model(torch.Tensor(feed['image']).to(device)).detach().numpy()

@@ -24,6 +24,7 @@ import dataset
 import imagenet
 import coco
 import openimages
+import torch
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("main")
@@ -255,6 +256,12 @@ def get_args():
     parser.add_argument("--performance-sample-count", type=int, help="performance sample count")
     parser.add_argument("--max-latency", type=float, help="mlperf max latency in pct tile")
     parser.add_argument("--samples-per-query", default=8, type=int, help="mlperf multi-stream samples per query")
+    
+    #Arguments for quantiation 
+    parser.add_argument("--quantize", action="store_true", help="quantize model using Model Compressor")
+    parser.add_argument("--quant_config_path", help="a config for model quantization")
+    parser.add_argument("--quant_param_path", help="quantization parameters for calibrated layers")
+    parser.add_argument("--quant_format_path", help="quantization specifications for calibrated layers")
     args = parser.parse_args()
 
     # don't use defaults in argparser. Instead we default to a dict, override that with a profile
@@ -292,8 +299,10 @@ def get_backend(backend):
         from backend_null import BackendNull
         backend = BackendNull()
     elif backend == "pytorch":
-        from backend_pytorch import BackendPytorch
-        backend = BackendPytorch()
+        # from backend_pytorch import BackendPytorch
+        # backend = BackendPytorch()
+        from backend_pytorch_native import BackendPytorchNative
+        backend = BackendPytorchNative()   
     elif backend == "pytorch-native":
         from backend_pytorch_native import BackendPytorchNative
         backend = BackendPytorchNative()      
@@ -343,8 +352,9 @@ class RunnerBase:
         # run the prediction
         processed_results = []
         try:
+            #results = self.model.model(torch.Tensor(qitem.img))
             results = self.model.predict({self.model.inputs[0]: qitem.img})
-            processed_results = self.post_process(results, qitem.content_id, qitem.label, self.result_dict)
+            processed_results = self.post_process(results.detach().numpy(), qitem.content_id, qitem.label, self.result_dict)
             if self.take_accuracy:
                 self.post_process.add_results(processed_results)
             self.result_timing.append(time.time() - qitem.start)
@@ -457,12 +467,12 @@ def add_results(final_results, name, result_dict, result_list, took, show_accura
     print("{} qps={:.2f}, mean={:.4f}, time={:.3f}{}, queries={}, tiles={}".format(
         name, result["qps"], result["mean"], took, acc_str,
         len(result_list), buckets_str))
+    print(result_dict["total"])
 
 
 def main():
     global last_timeing
     args = get_args()
-
     log.info(args)
 
     # find backend
@@ -501,6 +511,12 @@ def main():
                         **kwargs)
     # load model to backend
     model = backend.load(args.model, inputs=args.inputs, outputs=args.outputs)
+     
+    if args.quantize:
+        from quantization import quantize_model 
+        model = quantize_model(sut.model, args.quant_config_path, args.quant_param_path, args.quant_format_path)
+        
+    
     final_results = {
         "runtime": model.name(),
         "version": model.version(),
@@ -532,11 +548,12 @@ def main():
     count = ds.get_item_count()
 
     # warmup
-    ds.load_query_samples([0])
-    for _ in range(5):
-        img, _ = ds.get_samples([0])
-        _ = backend.predict({backend.inputs[0]: img})
-    ds.unload_query_samples(None)
+    # ds.load_query_samples([0])
+    # for _ in range(5):
+    #     img, _ = ds.get_samples([0])
+    #     import pdb; pdb.set_trace()
+    #     _ = backend.predict({backend.inputs[0]: img})
+    # ds.unload_query_samples(None)
 
     scenario = SCENARIO_MAP[args.scenario]
     runner_map = {
@@ -592,6 +609,7 @@ def main():
 
     performance_sample_count = args.performance_sample_count if args.performance_sample_count else min(count, 500)
     sut = lg.ConstructSUT(issue_queries, flush_queries)
+    
     qsl = lg.ConstructQSL(count, performance_sample_count, ds.load_query_samples, ds.unload_query_samples)
 
     log.info("starting {}".format(scenario))
@@ -599,7 +617,6 @@ def main():
     runner.start_run(result_dict, args.accuracy)
 
     lg.StartTestWithLogSettings(sut, qsl, settings, log_settings, audit_config)
-
     if not last_timeing:
         last_timeing = runner.result_timing
     if args.accuracy:
