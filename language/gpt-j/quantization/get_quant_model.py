@@ -139,7 +139,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
         model_compressor.calibrate(
             model=model_for_calib,
-            model_name=model_script["model"],
             calib_dataloader=calib_dataloader,
             weight_calib_method=model_script["weight_calib_method"],
             weight_granularity=model_script["weight_granularity"],
