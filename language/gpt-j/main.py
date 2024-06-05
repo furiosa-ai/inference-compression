@@ -44,9 +44,10 @@ def get_args():
     parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     parser.add_argument("--num_splits", type=int, default=1, help="")
     parser.add_argument("--split_idx", type=int, default=0, help="")
-    parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
+    parser.add_argument('--torch_optim',default='none',type=str,choices=['default', 'none'],help='Torch optimization.',)
     parser.add_argument("--model_source", type = str, default = "furiosa_llm_original", help="the type of GPTJForCausalLM to use")
     parser.add_argument('--n_layers',default='-1',type=int, help='set the number of layers.',)
+    parser.add_argument('--calib_without_padding', action="store_true", default=False, help="use mcp to quantize the model")
     
     args = parser.parse_args()
     return args
@@ -78,7 +79,7 @@ def main():
     )
 
     if args.use_mcp:
-        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.recalibrate)
+        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.calib_without_padding, args.recalibrate)
 
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]

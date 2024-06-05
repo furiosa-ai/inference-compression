@@ -77,7 +77,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
 
@@ -99,7 +99,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         
         else:
             from .calibration_utils.make_calib_dataloader import make_calib_dataloader
-            calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'])
+            calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], calib_without_padding)
             
   
     run_autoscale = model_script.get("autoscale", 'disabled') != 'disabled'  
