@@ -48,23 +48,20 @@ class SUT_base():
             self.gen_source  = 'GenerationMixin'
         else:
             if model_source == 'furiosa_llm_original':
-                from furiosa_llm_models.gptj.huggingface import GPTJForCausalLM 
+                from furiosa_llm_models.gptj.symbolic.huggingface import GPTJForCausalLM 
                 self.gen_source  = 'GenerationMixin'
-            elif model_source == 'paged_attention_concat':
-                from furiosa_llm_models.gptj.paged_attention_concat import GPTJForCausalLM 
-                self.gen_source  = 'QuantPagedAttentionGenerator'
             elif model_source == 'furiosa_llm_rope':
-                from furiosa_llm_models.gptj.huggingface_rope import GPTJForCausalLM
+                from furiosa_llm_models.gptj.symbolic.huggingface_rope import GPTJForCausalLM
                 self.gen_source = 'GenerationMixin'
-            elif model_source == 'paged_attention_concat_rope':
-                from furiosa_llm_models.gptj.paged_attention_concat_rope import GPTJForCausalLM
-                self.gen_source  = 'QuantPagedAttentionConcatGenerator'
-            elif model_source == 'preallocated_concat_rope':
-                from furiosa_llm_models.gptj.preallocated_concat_rope import GPTJForCausalLM
-                self.gen_source = 'QuantPreAllocatedGenerator'
             elif model_source == 'paged_attention_rope':
-                from furiosa_llm_models.gptj.paged_attention_rope import GPTJForCausalLM
-                self.gen_source = 'QuantPagedAttentionGenerator'
+                from furiosa_llm_models.gptj.symbolic.paged_attention_rope import GPTJForCausalLM
+                self.gen_source  = 'QuantPagedAttentionGenerator'
+            elif model_source == 'preallocated_concat_rope':
+                from furiosa_llm_models.gptj.symbolic.preallocated_concat_rope import GPTJForCausalLM
+                self.gen_source = 'QuantPreAllocatedGenerator'
+            elif model_source == 'paged_attention_optimized_packed':
+                from furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope import GPTJForCausalLM
+                self.gen_source = 'PagedAttentionPackedGenerator'
 
             model_cls = GPTJForCausalLM
 
@@ -100,7 +97,9 @@ class SUT_base():
             padding_side="left",
             use_fast=False,)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-
+        
+        self.model.config.pad_token_id = self.tokenizer.pad_token_id
+        
         self.data_object = Dataset(
             self.dataset_path, total_count_override=max_examples, num_splits=num_splits, split_idx=split_idx)
         self.qsl = lg.ConstructQSL(self.data_object.count, self.data_object.perf_count,
@@ -147,12 +146,12 @@ class SUT_base():
             # To Do: Implement beam seach for paged attention & preallocated generator
             if self.gen_source == 'GenerationMixin':
                 output_batch = self.model.generate(**input_batch, **gen_kwargs, pad_token_id=self.tokenizer.eos_token_id)
-            elif self.gen_source == 'QuantPagedAttentionConcatGenerator':
-                output_batch = self.model.generate(input_batch, pad_token_id = self.tokenizer.pad_token_id, eos_token_id = self.model.model.prefill_model.config.eos_token_id)
-            elif self.gen_source == 'QuantPreAllocatedGenerator':  
-                output_batch = self.model.generate(input_batch, **gen_kwargs)
             elif self.gen_source == 'QuantPagedAttentionGenerator':
                 output_batch = self.model.generate(input_batch, **gen_kwargs)
+            elif self.gen_source == 'QuantPreAllocatedGenerator':  
+                output_batch = self.model.generate(input_batch, **gen_kwargs)
+            elif self.gen_source == 'PagedAttentionPackedGenerator':
+                output_batch = self.model.generate(**input_batch, max_length=2048, **gen_kwargs)
             else:
                 raise NotImplementedError
 

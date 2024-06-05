@@ -21,13 +21,12 @@ gen_kwargs = {
 
 
 FURIOSA_GENERATOR_DICT = {
-    furiosa_llm_models.gptj.paged_attention_concat.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
-    furiosa_llm_models.gptj.paged_attention_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_generator_concat.QuantPagedAttentionGenerator,
-    furiosa_llm_models.gptj.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator,
-    furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_generator.QuantPagedAttentionGenerator,
+    furiosa_llm_models.gptj.symbolic.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator,
+    furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.symbolic.quant_paged_attention_generator.QuantPagedAttentionGenerator,
+    furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch,
 }
 
-def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
+def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
     #artibrary set to accomodate input prompt & generated summary
     
     if kv_dtype == 'float32':
@@ -39,7 +38,7 @@ def get_total_block_space(config, num_blocks = 32 , block_size = 1, bucket_size 
     else:
         raise NotImplementedError
     
-    num_blocks = ((1633)*2+1)*5
+    num_blocks = batch_size * 4  * 2 * (bucket_size) * block_size + 1
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
@@ -88,11 +87,14 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
-        if type(model) == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
+        if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
             from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
-        
+        elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
+            from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
+            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
+            calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
         # elif type(model) == furiosa_llm_models.gptj.paged_attention_rope
         
         else:
@@ -109,10 +111,10 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
     model_type = type(model)
 
     if calib_dataloader:
-        if type(model) == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
-            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
+        if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
+            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False, disable_check=True)
         else:
-            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
+            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True,  disable_check=True)
 
         # Extract necessary parameters to initialize QuantPreTrainedModel
         model_for_calib = model_compressor.create_quantsim_model(
@@ -173,7 +175,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
         del model_for_calib
 
-    if model_type == furiosa_llm_models.gptj.paged_attention_rope.GPTJForCausalLM:
+    if model_type == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
         #There is no prefill model for paged_attention_rope as past_key_values are always fed to the model
         decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
         decode_model = model_compressor.create_quantsim_model(
@@ -194,6 +196,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
+            delete_org_weight=True,
             model_name = "GPTJForCausalLM",
         )
         generator = FURIOSA_GENERATOR_DICT[model_type]
@@ -203,8 +206,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
         return generator(decode_model, model_type, total_block_space, bucket_size) 
 
     else: 
-        prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True)
-        decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
+        prefill_model, prefill_input_names, prefill_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = True, disable_check = True)
+        decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False, disable_check = True)
 
         input_names = {
             "prefill_input_names" : prefill_input_names,
@@ -235,6 +238,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = False,
+            delete_org_weight=True,
             model_name = "GPTJForCausalLM",
         )
 
@@ -257,6 +261,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
+            delete_org_weight=True,
             model_name = "GPTJForCausalLM",
             quantized_prefill_model=prefill_model,
         )
@@ -270,8 +275,12 @@ def get_quant_model(model, calib_dataset_path, model_script_path, recalibrate):
 
         if model_type in FURIOSA_GENERATOR_DICT.keys():
             generator = FURIOSA_GENERATOR_DICT[model_type]
-            if generator == furiosa_llm_models.generators.v2.QuantPreAllocatedConcatGenerator:
+            if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
                 return generator(quant_causallm, bucket_size = 2048)
+            elif generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch:
+                quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
+                quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
+                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
             else:
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
