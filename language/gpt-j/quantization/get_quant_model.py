@@ -24,6 +24,7 @@ FURIOSA_GENERATOR_DICT = {
     furiosa_llm_models.gptj.symbolic.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator,
     furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.symbolic.quant_paged_attention_generator.QuantPagedAttentionGenerator,
     furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch,
+    furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope_erf_gelu.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch,
 }
 
 def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
@@ -91,7 +92,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
-        elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
+        elif type(model) in [furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM,
+                             furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope_erf_gelu.GPTJForCausalLM,]:
             from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
