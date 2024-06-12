@@ -28,7 +28,14 @@ def get_args():
     parser.add_argument("--enable-log-trace", action="store_true", help="Enable log tracing. This file can become quite large")
     parser.add_argument("--num-workers", type=int, default=1, help="Number of workers to process queries")
     
-    parser.add_argument("--model_source", choices=["transformers", "furiosa_llm_original", "furiosa_llm_rope", "preallocated_concat_rope"], default="transformers", help="the type of GPTJForCausalLM to use")
+    parser.add_argument("--model_source", 
+                        choices=[
+                            "furiosa_llm_rope", 
+                            "preallocated_concat_rope", 
+                            "paged_attention_optimized_packed"
+                            ], 
+                        default="furiosa_llm_rope", 
+                        help="the type of GPTJForCausalLM to use")
     parser.add_argument("--quantize", action="store_true", help="quantize model using ModelComPressor(MCP)")
     parser.add_argument("--quant_config_path", help="a config for model quantization")
     parser.add_argument("--quant_param_path", help="quantization parameters for calibraed layers")
@@ -82,6 +89,7 @@ def main():
 
     sut = sut_cls(
         model_path=args.model_path,
+        model_source=args.model_source,
         dtype=args.dtype,
         dataset_path=args.dataset_path,
         total_sample_count=args.total_sample_count,

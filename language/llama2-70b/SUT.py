@@ -6,7 +6,14 @@ import torch
 from torch.nn.functional import pad
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
+import accelerate
+import transformers
+
+
+from furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope import LlamaForCausalLM
+from furiosa_llm_models.generators.symbolic.paged_attention_optimized_generator import (
+    PagedAttentionGenerator as TextGeneratorGreedySearch,
+)
 from transformers.generation.streamers import BaseStreamer
 
 import pickle
@@ -24,6 +31,9 @@ from dataset import Dataset
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Llama-70B-SUT")
+
+log.info(f"{transformers.__file__}")
+log.info(f"{accelerate.__file__}")
 
 gen_kwargs = {
     "early_stopping": True,
@@ -81,6 +91,7 @@ class FirstTokenStreamer(BaseStreamer):
 class SUT():
     def __init__(self,
                  model_path=None,
+                 model_source='furiosa_llm_rope',
                  dtype="bfloat16",
                  device="cpu",
                  batch_size=None,
@@ -91,6 +102,7 @@ class SUT():
                  workers=1):
 
         self.model_path = model_path or "meta-llama/Llama-2-70b-chat-hf"
+        self.model_source = model_source
         self.device = device
         self.n_layers = n_layers
         if not batch_size:
@@ -195,13 +207,23 @@ class SUT():
 
                 tik2 = time.time()
 
-                pred_output_tokens = self.model.generate(
-                    input_ids=input_ids_tensor,
-                    attention_mask=input_masks_tensor,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    **gen_kwargs
-                )
-
+                
+                if self.gen_source == 'GenerationMixin':
+                    pred_output_tokens = self.model.generate(
+                        input_ids=input_ids_tensor,
+                        attention_mask=input_masks_tensor,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        **gen_kwargs)
+                elif self.gen_source == 'PagedAttentionPackedGenerator':
+                    pred_output_tokens = self.model.generate(
+                        input_ids=input_ids_tensor,
+                        attention_mask=input_masks_tensor,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        max_length=2048,
+                        **gen_kwargs)
+                else:
+                    NotImplemented
+                
                 tik3 = time.time()
 
                 processed_output = self.data_object.postProcess(pred_output_tokens,
@@ -230,6 +252,13 @@ class SUT():
 
 
     def load_model(self):
+        if self.model_source == 'furiosa_llm_rope':
+            from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
+            self.gen_source  = 'GenerationMixin'
+        elif self.model_source == 'paged_attention_optimized_packed':
+            from furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope import LlamaForCausalLM
+            self.gen_source = 'PagedAttentionPackedGenerator'
+
         if self.n_layers > 0:
             from transformers import AutoConfig
             config_exp =  AutoConfig.from_pretrained(self.model_path)

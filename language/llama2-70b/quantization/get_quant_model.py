@@ -6,7 +6,7 @@ import model_compressor
 from typing import Optional 
 from dataset import Dataset
 import copy
-from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
+import furiosa_llm_models
 from accelerate import init_empty_weights
 import gc
 
@@ -54,15 +54,30 @@ def get_quant_model(model, args):
     
     model_type = type(model)
 
-    (
-        prefill_model,
-        prefill_input_names,
-        prefill_concrete_args,
-    ) = model_compressor.helper.llama_custom_symbolic_trace(
-        model, 
-        input_names=["input_ids", "attention_mask", "position_ids"], 
-        disable_check=True
-    )
+    if model_type == furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope.LlamaForCausalLM:
+        
+        prefill_model = model.trace_prefill()
+        decode_model = model.trace_decode()
+
+    else:
+        (
+            prefill_model,
+            prefill_input_names,
+            prefill_concrete_args,
+        ) = model_compressor.helper.llama_custom_symbolic_trace(
+            model, 
+            input_names=["input_ids", "attention_mask", "position_ids"], 
+            disable_check=True
+        )
+        (
+            decode_model,
+            decode_input_names,
+            decode_concrete_args,
+        ) = model_compressor.helper.llama_custom_symbolic_trace(
+            model,
+            input_names=["input_ids", "past_key_values", "attention_mask", "position_ids"],
+            disable_check=True,
+        )
     
     prefill_quantized_model = model_compressor.create_quantsim_model(
         prefill_model,
@@ -75,17 +90,6 @@ def get_quant_model(model, args):
         disable_inout=(True, True),
         weighted_op_emul_dtype=args.weighted_op_emul_dtype,
         delete_org_weight=True,
-        model_name='LlamaForCausalLM',
-    )
-    
-    (
-        decode_model,
-        decode_input_names,
-        decode_concrete_args,
-    ) = model_compressor.helper.llama_custom_symbolic_trace(
-        model,
-        input_names=["input_ids", "past_key_values", "attention_mask", "position_ids"],
-        disable_check=True,
     )
 
     decode_quantized_model = model_compressor.create_quantsim_model(
@@ -101,26 +105,38 @@ def get_quant_model(model, args):
         weighted_op_emul_dtype=args.weighted_op_emul_dtype,
         quantized_prefill_model=prefill_quantized_model,
         delete_org_weight=True,
-        model_name='LlamaForCausalLM',
     )
 
-    input_names = {
-        "prefill_input_names" : prefill_input_names,
-        "decode_input_names" : decode_input_names,
-    }
+    if model_type == furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope.LlamaForCausalLM:
+        from furiosa_llm_models.generators.symbolic.paged_attention_optimized_generator import (
+            PagedAttentionGenerator as TextGeneratorGreedySearch,
+        )
+        kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16'
 
-    concrete_args = {
-        "prefill_concrete_args": prefill_concrete_args,
-        "decode_concrete_args": decode_concrete_args,
-    }
-    
-    
-    quant_models = {
-        "prefill_model": prefill_quantized_model.eval(),
-        "decode_model": decode_quantized_model.eval(),
-    }
-    
-    #llama_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
-    
-    #return QuantPreAllocatedConcatGenerator(llama_causallm, bucket_size=2048)
-    return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
+        generator = TextGeneratorGreedySearch(
+            prefill=prefill_quantized_model,
+            decode=decode_quantized_model,
+            kv_dtype=torch.int8 if kv_dtype == 'int8' else torch.bfloat16,
+            return_tensors=True,
+            bucket_size=2048,
+        )
+
+        return generator
+    else:
+        input_names = {
+            "prefill_input_names" : prefill_input_names,
+            "decode_input_names" : decode_input_names,
+        }
+
+        concrete_args = {
+            "prefill_concrete_args": prefill_concrete_args,
+            "decode_concrete_args": decode_concrete_args,
+        }
+        
+        
+        quant_models = {
+            "prefill_model": prefill_quantized_model.eval(),
+            "decode_model": decode_quantized_model.eval(),
+        }
+
+        return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
