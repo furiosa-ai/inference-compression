@@ -1,8 +1,9 @@
 import torch
 from typing import List 
-from torch.utils.data import DataLoader
 from dataset import Dataset
+from torch.utils.data import DataLoader
 from furiosa_llm_models.gptj.symbolic.paged_attention_utils import InputMetadata
+from .custom_dataset import Dataset_with_total_block
 
 __all__ = ["make_calib_dataloader_for_paged_attention"]
 
@@ -141,12 +142,12 @@ def make_calib_dataloader_for_paged_attention(calib_dataset_path, batch_size, bu
                         "input_ids": bucketized_input_ids.squeeze(0), 
                         "attention_mask": bucketized_attention_mask.squeeze(0), 
                         "position_ids": starting_position_ids.squeeze(0), 
-                        "past_key_values": total_block_space, 
                     }
         data_list.append(model_inputs)
+        
+    dataset = Dataset_with_total_block(data_list, total_block_space)
     
-
-    return DataLoader(data_list, batch_size)
+    return DataLoader(dataset)
 
 
 

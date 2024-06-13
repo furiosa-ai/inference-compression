@@ -2,11 +2,11 @@
 import os
 import random
 from typing import Dict, List, Tuple
-
+from dataset import Dataset
 import torch
 from torch.utils.data import DataLoader
-from dataset import Dataset
 from furiosa_llm_models.generators.packing import greedy_attention_packing
+from .custom_dataset import Dataset_with_total_block
 
 def prepare_prefill_input_metadata(
         attention_mask: torch.Tensor, zero_block_index, available_block_indices, active_key_block_indices, active_value_block_indices
@@ -134,11 +134,14 @@ def make_calib_dataloader_for_paged_attention_packed(
         "input_ids": packed_input_ids,
         "causal_mask": causal_mask,
         "position_ids": packed_position_ids,
-        "past_key_values": total_block_space,
         "new_key_location": new_key_location,
         "new_value_location": new_value_location,
         }
 
         data_list.append(model_inputs)
+    
+    dataset = Dataset_with_total_block(data_list, total_block_space)
+    return DataLoader(dataset)
 
-    return DataLoader(data_list)
+
+
