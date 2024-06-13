@@ -98,8 +98,16 @@ def cal_data_loader(model, model_path, model_source, data_path, batch_size, n_ca
         return DataLoader(data_list, batch_size=batch_size)
 
 
-def calibrate(model, qconfig, qparam_path, qformat_path, calib_dataloader):
-    model = model.trace_prefill()
+def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dataloader):
+    if model_source == 'paged_attention_optimized_packed':
+        model = model.trace_prefill()
+    else:
+        model, _,_ = model_compressor.helper.llama_custom_symbolic_trace(
+            model,
+            input_names=["input_ids", "attention_mask", "position_ids"], 
+            disable_check=True
+            )
+
 
     model = model_compressor.create_quantsim_model(
         model,
@@ -200,6 +208,7 @@ def main():
     )
     calibrate(
         model,
+        args.model_source,
         qconfig,
         args.quant_param_path,
         args.quant_format_path,
