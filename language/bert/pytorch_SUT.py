@@ -106,10 +106,8 @@ class BERT_PyTorch_SUT():
                 padded_sequences['input_ids'] = torch.LongTensor(sample_input.input_ids).unsqueeze(0).to(self.dev)
                 padded_sequences['attention_mask'] = torch.LongTensor(sample_input.input_mask).unsqueeze(0).to(self.dev)
                 padded_sequences['token_type_ids'] = torch.LongTensor(sample_input.segment_ids).unsqueeze(0).to(self.dev)
+                
                 def bucket_pad(tensor):
-                    if 512 is None:
-                        return tensor
-
                     padding_size = 512 - tensor.shape[-1]
                     return pad(tensor, (0, padding_size))
                 
@@ -117,8 +115,9 @@ class BERT_PyTorch_SUT():
                     greedy_attention_packing_bert(
                         input_ids=bucket_pad(padded_sequences["input_ids"]),
                         token_type_ids=bucket_pad(padded_sequences["token_type_ids"]),
-                        bucketized_attention_mask=bucket_pad(input_ids.shape["attention_mask"]),
+                        bucketized_attention_mask=bucket_pad(padded_sequences["attention_mask"]),
                         pad_token_id=0,
+                        compact_mask=False,
                     )
                 )
 
@@ -129,20 +128,17 @@ class BERT_PyTorch_SUT():
                     position_ids=position_ids
                     )
                 
-                """
-                padded_sequences={}
-                padded_sequences['input_ids'] = torch.LongTensor(sample_input.input_ids).unsqueeze(0).to(self.dev)
-                padded_sequences['attention_mask'] = torch.LongTensor(sample_input.input_mask).unsqueeze(0).to(self.dev)
-                padded_sequences['token_type_ids'] = torch.LongTensor(sample_input.segment_ids).unsqueeze(0).to(self.dev)
-                model_output = self.model.generate(
-                        padded_sequences=padded_sequences,
-                        bucket_size=512,
-                        pad_token_id=0,
-                        )
-                """
+
             if self.version >= '4.0.0':
-                start_scores = model_output['start_logits']
-                end_scores = model_output['end_logits']
+                if self.model_source == "huggingface_rngd_gelu":
+                    start_scores = model_output['start_logits']
+                    end_scores = model_output['end_logits']
+                elif self.model_source == "mlperf_submission":
+                    start_scores = model_output[:,:,0]
+                    end_scores = model_output[:,:,1]
+                else:
+                    NotImplemented
+                    
             else:
                 start_scores, end_scores = model_output
             output = torch.stack([start_scores, end_scores], axis=-1).squeeze(0).cpu().numpy()
