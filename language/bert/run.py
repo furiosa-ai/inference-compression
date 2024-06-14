@@ -56,9 +56,9 @@ def get_args():
     parser.add_argument("--use_mcp", action="store_true", help="use mcp to quantize the model")
     parser.add_argument("--recalibrate", action="store_true", default=False, help="load already existing quantization metadata")
     parser.add_argument("--n_calib", type=int,  default=-1)
-    parser.add_argument('--torch_optim',default='default',type=str,choices=['default', 'none'],help='Torch optimization.',)
+    parser.add_argument('--torch_optim',default='none',type=str,choices=['default', 'none'],help='Torch optimization.',)
     parser.add_argument('--n_layers',default='-1',type=int, help='set the number of layers.',)
-    parser.add_argument('--model_source',default='unsplit_packed',type=str,choices=['huggingface', 'unsplit_packed'], help='choose model source',)
+    parser.add_argument('--model_source',default='unsplit_packed',type=str,choices=['huggingface_rngd_gelu', 'mlperf_submission'], help='choose model source',)
 
     args = parser.parse_args()
     return args
