@@ -115,7 +115,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
 
     if calib_dataloader:
         if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
-            assert ValueError('This model will be replaced with paged_attention_rope_rngd_gelu')       
+        #The following usage of mcp helper tracer will be removed soon once paged_attention_rope_rngd_gelu is added   
+            model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False, disable_check=True)    
         else:
             model_for_calib = model.trace_prefill()
 
@@ -179,7 +180,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
 
     if model_type == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
         #There is no prefill model for paged_attention_rope as past_key_values are always fed to the model
-        assert ValueError('This model will be replaced with paged_attention_rope_rngd_gelu')       
+        #The following usage of mcp helper tracer will be removed soon once paged_attention_rope_rngd_gelu is added   
         decode_model, decode_input_names, decode_concrete_args = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False)
         decode_model = model_compressor.create_quantsim_model(
             decode_model,
@@ -275,7 +276,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             generator = FURIOSA_GENERATOR_DICT[model_type]
             # if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
             #     return generator(quant_causallm, bucket_size = 2048)
-            if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch:
+            if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
                 return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
