@@ -53,21 +53,24 @@ class SUT_base():
             elif model_source == 'furiosa_llm_rope':
                 from furiosa_llm_models.gptj.symbolic.huggingface_rope import GPTJForCausalLM
                 self.gen_source = 'GenerationMixin'
-            elif model_source == 'furiosa_llm_rope_erf':
-                from furiosa_llm_models.gptj.symbolic.huggingface_rope_erf_gelu import GPTJForCausalLM
+            elif model_source == 'furiosa_llm_rope_rngd_gelu':
+                from furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu import GPTJForCausalLM
                 self.gen_source = 'GenerationMixin'
             elif model_source == 'paged_attention_rope':
                 from furiosa_llm_models.gptj.symbolic.paged_attention_rope import GPTJForCausalLM
                 self.gen_source  = 'QuantPagedAttentionGenerator'
-            elif model_source == 'preallocated_concat_rope':
-                from furiosa_llm_models.gptj.symbolic.preallocated_concat_rope import GPTJForCausalLM
-                self.gen_source = 'QuantPreAllocatedGenerator'
-            elif model_source == 'paged_attention_optimized_packed':
-                from furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope import GPTJForCausalLM
-                self.gen_source = 'PagedAttentionPackedGenerator'
-            elif model_source == 'paged_attention_optimized_packed_erf':
-                from furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope_erf_gelu import GPTJForCausalLM
-                self.gen_source = 'PagedAttentionPackedGenerator'
+            # elif model_source == 'preallocated_concat_rope':
+            #     from furiosa_llm_models.gptj.symbolic.preallocated_concat_rope import GPTJForCausalLM
+            #     self.gen_source = 'QuantPreAllocatedGenerator'
+            # elif model_source == 'paged_attention_optimized_packed':
+            #     from furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope import GPTJForCausalLM
+            #     self.gen_source = 'PagedAttentionPackedGenerator'
+            # elif model_source == 'paged_attention_optimized_packed_erf':
+            #     from furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope_erf_gelu import GPTJForCausalLM
+            #     self.gen_source = 'PagedAttentionPackedGenerator'
+            elif model_source == 'mlperf_submission':
+                from furiosa_llm_models.gptj.symbolic.mlperf_submission import GPTJForCausalLM
+                self.gen_source = 'MLPerf_submision_generator'
 
             model_cls = GPTJForCausalLM
 
