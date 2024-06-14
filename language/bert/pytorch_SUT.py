@@ -59,10 +59,10 @@ class BERT_PyTorch_SUT():
         
         print("Loading PyTorch model...")
         
-        if self.model_source == 'huggingface':
-            from furiosa_llm_models.bert.symbolic.huggingface import BertForQuestionAnswering
-        elif self.model_source == 'unsplit_packed':
-            from furiosa_llm_models.bert.symbolic.huggingface_unsplit_packed import BertForQuestionAnswering
+        if self.model_source == 'huggingface_rngd_gelu':
+            from furiosa_llm_models.bert.symbolic.huggingface_rngd_gelu import BertForQuestionAnswering
+        elif self.model_source == 'mlperf_submission':
+            from furiosa_llm_models.bert.symbolic.mlperf_submission import BertForQuestionAnswering
         
         self.model = BertForQuestionAnswering(config)
         self.model.to(self.dev)
@@ -93,12 +93,12 @@ class BERT_PyTorch_SUT():
             segment_ids = sample_input.segment_ids
 
         with torch.no_grad():
-            if self.model_source == 'huggingface':
+            if self.model_source == 'huggingface_rngd_gelu':
                 model_output = self.model.forward(input_ids=torch.LongTensor(input_ids).unsqueeze(0).to(self.dev),
                     attention_mask=torch.LongTensor(input_mask).unsqueeze(0).to(self.dev),
                     token_type_ids=torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev))
-            elif self.model_source == 'unsplit_packed':
-                """
+            elif self.model_source == 'mlperf_submission':
+                
                 from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
                 from torch.nn.functional import pad
 
@@ -128,8 +128,8 @@ class BERT_PyTorch_SUT():
                     attention_mask=attention_mask,
                     position_ids=position_ids
                     )
+                
                 """
-
                 padded_sequences={}
                 padded_sequences['input_ids'] = torch.LongTensor(sample_input.input_ids).unsqueeze(0).to(self.dev)
                 padded_sequences['attention_mask'] = torch.LongTensor(sample_input.input_mask).unsqueeze(0).to(self.dev)
@@ -139,7 +139,7 @@ class BERT_PyTorch_SUT():
                         bucket_size=512,
                         pad_token_id=0,
                         )
-                
+                """
             if self.version >= '4.0.0':
                 start_scores = model_output['start_logits']
                 end_scores = model_output['end_logits']
