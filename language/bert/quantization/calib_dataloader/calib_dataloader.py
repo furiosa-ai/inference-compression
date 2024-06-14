@@ -21,6 +21,7 @@ def make_packed_calib_data_loader(calib_dataset, bucket_size, pad_token_id):
                 token_type_ids=bucket_pad(batch["token_type_ids"]),
                 bucketized_attention_mask=bucket_pad(batch["attention_mask"]),
                 pad_token_id=pad_token_id,
+                compact_mask=False,
             )
         )
 

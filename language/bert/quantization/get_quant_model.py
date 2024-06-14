@@ -1,7 +1,6 @@
 import yaml
 import os 
 from torch.utils.data import DataLoader
-from transformers.utils.fx import symbolic_trace
 from .calib_dataloader import make_dataloader
 import model_compressor
 import torch
@@ -32,18 +31,12 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate):
     qparam_path = f"{output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
 
     
-    if model_source == 'huggingface':
-        input_names=["input_ids", "token_type_ids", "attention_mask"]
-    elif model_source == 'unsplit_packed':
-        input_names=["input_ids", "token_type_ids", "attention_mask", "position_ids"]
-    
-    
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
         calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib)
 
-        if model_source == 'unsplit_packed':
+        if model_source == 'mlperf_submission':
             from .calib_dataloader import make_packed_calib_data_loader
             calib_dataloader = make_packed_calib_data_loader(calib_dataloader, 512, 0)
     
@@ -51,8 +44,9 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate):
     
     
     if calib_dataloader:
-        model_for_calib = symbolic_trace(sut.model, input_names=input_names, disable_check=False)
-
+        #model_for_calib = symbolic_trace(sut.model, input_names=input_names, disable_check=False)
+        model_for_calib = sut.model.trace()
+        
         model_for_calib = model_compressor.create_quantsim_model(
             model_for_calib,
             qformat_path = None,
@@ -109,8 +103,8 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate):
         del model_for_calib
     
 
-    model = symbolic_trace(sut.model, input_names=input_names,disable_check=False)
-    
+    #model = symbolic_trace(sut.model, input_names=input_names,disable_check=False)
+    model = sut.model.trace()
 
     quant_model = model_compressor.create_quantsim_model(
         model,
@@ -132,9 +126,7 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate):
         disable_inout=(True,True),
     )
     
-    if model_source == 'huggingface':
-        return quant_model
-    elif model_source == 'unsplit_packed':
-        from furiosa_llm_models.generators.bert_generator import BertUnsplitPackedGenerator
-        return BertUnsplitPackedGenerator(model=quant_model)
+    
+    
+    return quant_model
     
