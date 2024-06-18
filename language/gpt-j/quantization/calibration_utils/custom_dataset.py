@@ -14,7 +14,7 @@ class Dataset_with_total_block(Dataset):
         
         return input_kwargs
     
-    def move_past_key_values(self, device = None , device_map = None):
+    def move_total_block_to_device(self, device = None , device_map = None):
         if device == None and device_map == None:
             raise RuntimeError
 
