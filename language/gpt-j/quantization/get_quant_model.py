@@ -98,7 +98,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
-        # elif type(model) == furiosa_llm_models.gptj.paged_attention_rope
+        # elif type(model) == furiosa_llm_models.gptj.paged_attentin_rope
         
         else:
             from .calibration_utils.make_calib_dataloader import make_calib_dataloader
@@ -238,7 +238,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-            decode_phase = False,
+            # decode_phase = True,
             delete_org_weight=True,
         )
 
