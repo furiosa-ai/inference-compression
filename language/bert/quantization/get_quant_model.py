@@ -16,14 +16,13 @@ def load_model_script(model_script_path):
     return model_script
 
 
-def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate):
+def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, output_path='./quantization/output'):
     #Load model script and calibration dataloader
     model_script = load_model_script(model_script_path)
     qlevel = model_script["qlevel"]
     
-    sut.model.config.use_cache = False
+    sut.model.config.use_cache = False   
     
-    output_path='./quantization/output'
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
@@ -38,7 +37,7 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate):
 
         if model_source == 'mlperf_submission':
             from .calib_dataloader import make_packed_calib_data_loader
-            calib_dataloader = make_packed_calib_data_loader(calib_dataloader, 512, 0)
+            calib_dataloader = make_packed_calib_data_loader(calib_dataloader, 384, 0) 
     
     
     
