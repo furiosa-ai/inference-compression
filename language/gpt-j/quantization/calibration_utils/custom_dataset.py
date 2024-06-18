@@ -14,4 +14,21 @@ class Dataset_with_total_block(Dataset):
         
         return input_kwargs
     
+    def move_past_key_values(self, device = None , device_map = None):
+        if device == None and device_map == None:
+            raise RuntimeError
+
+        for type_idx in range(len(self.total_block_space)):
+            self.total_block_space[type_idx] = list(self.total_block_space[type_idx])
+            for block_idx in range(len(self.total_block_space[type_idx])):
+                kv_cache_device = device
+                if device_map is not None:
+                    if isinstance(device[str(type_idx)], int):
+                        kv_cache_device = device[str(type_idx)]
+                self.total_block_space[type_idx][block_idx] = self.total_block_space[type_idx][block_idx].squeeze(0).to(kv_cache_device)
+                            
+                
+        
+        
+    
     
