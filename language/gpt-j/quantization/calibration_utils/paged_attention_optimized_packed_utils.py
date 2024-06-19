@@ -141,7 +141,7 @@ def make_calib_dataloader_for_paged_attention_packed(
         data_list.append(model_inputs)
     
     dataset = Dataset_for_paged_attention(data_list, total_block_space)
-    return DataLoader(dataset)
+    return DataLoader(dataset, batch_size)
 
 
 
