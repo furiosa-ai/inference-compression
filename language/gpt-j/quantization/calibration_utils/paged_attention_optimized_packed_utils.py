@@ -6,7 +6,7 @@ from dataset import Dataset
 import torch
 from torch.utils.data import DataLoader
 from furiosa_llm_models.generators.packing import greedy_attention_packing
-from .custom_dataset import Dataset_with_total_block
+from .dataset_paged_attention import Dataset_for_paged_attention
 
 def prepare_prefill_input_metadata(
         attention_mask: torch.Tensor, zero_block_index, available_block_indices, active_key_block_indices, active_value_block_indices
@@ -140,7 +140,7 @@ def make_calib_dataloader_for_paged_attention_packed(
 
         data_list.append(model_inputs)
     
-    dataset = Dataset_with_total_block(data_list, total_block_space)
+    dataset = Dataset_for_paged_attention(data_list, total_block_space)
     return DataLoader(dataset)
 
 
