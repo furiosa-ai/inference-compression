@@ -83,9 +83,6 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
-
-    # qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
-    # qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
     
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None

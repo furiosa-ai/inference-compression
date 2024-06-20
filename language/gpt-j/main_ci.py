@@ -92,19 +92,19 @@ def compare_model_outputs():
     #for the sake of convenience 
     from furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu import GPTJForCausalLM
     config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
-    hf_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
+    golden_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
     
     
 
     
-    calib_dataset_path = './ci_test_file/calibration_dataset.json'
+    calib_dataset_path = './ci_test_file/calibration_dataset_100.json'
     evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
     model_script_path = './ci_test_file/model_script.yaml'
-    qformat_path = './ci_test_file/hf_qformat.yaml'
-    qparam_path = './ci_test_file/hf_qparam.npy'
+    qformat_path = './ci_test_file/golden_qformat.yaml'
+    qparam_path = './ci_test_file/golden_qparam.npy'
     
     
-    hf_rope_generator = quantization.get_quant_model(model = hf_model, 
+    golden_model_generator = quantization.get_quant_model(model = golden_model, 
                                                      calib_dataset_path = calib_dataset_path, 
                                                      model_script_path = model_script_path, 
                                                      calib_without_padding = False, 
@@ -130,16 +130,16 @@ def compare_model_outputs():
     
     #Turn on dumping 
     model_compressor.set_model_to_dump_golden_model(
-                './ci_test_file/hf_prefill_logits.pkl',
-                hf_rope_generator.prefill_model,
+                './ci_test_file/golden_prefill_logits.pkl',
+                golden_model_generator.prefill_model,
                 dumping_range='qlv4_linear',
                 dumping_mode='only-in-out', 
                 qlv4_skip_output_rounding=False,
                 dumping_before_rounding=True,
             )
     model_compressor.set_model_to_dump_golden_model(
-                './ci_test_file/hf_decode_logits.pkl',
-                hf_rope_generator.decode_model,
+                './ci_test_file/golden_decode_logits.pkl',
+                golden_model_generator.decode_model,
                 dumping_range='qlv4_linear',
                 dumping_mode='only-in-out', 
                 qlv4_skip_output_rounding=False,
@@ -176,16 +176,16 @@ def compare_model_outputs():
         input_batch['attention_mask'] = validation_dataset.source_encoded_attn_masks[idx].to(device)
         #default dtype are set as fp32 during inference
         #with torch.inference_mode(), torch.autocast(device_type=torch_device_type, enabled=False, dtype=None):
-        output_batch_hf = hf_rope_generator.generate(**input_batch, **gen_kwargs, pad_token_id = config.eos_token_id)
+        output_batch_golden = golden_model_generator.generate(**input_batch, **gen_kwargs, pad_token_id = config.eos_token_id)
         output_batch_submission = submission_generator.generate(**input_batch, max_length=2048, **gen_kwargs)
     
     
         
-    is_logit_same(golden_model_file_path='./ci_test_file/hf_prefill_logits.pkl',
+    is_logit_same(golden_model_file_path='./ci_test_file/golden_prefill_logits.pkl',
                   comparison_model_file_path = './ci_test_file/submission_prefill_logits.pkl', 
                   mcm_name_to_check='lm_logits')
     
-    is_logit_same(golden_model_file_path='./ci_test_file/hf_decode_logits.pkl',
+    is_logit_same(golden_model_file_path='./ci_test_file/golden_decode_logits.pkl',
                   comparison_model_file_path ='./ci_test_file/submission_decode_logits.pkl',
                   mcm_name_to_check='lm_logits',
                   decode = True)
