@@ -7,8 +7,17 @@ from transformers import BertTokenizer
 
 
 def make_packed_calib_data_loader(
-    calib_eval_features , batch_size, n_calib, pad_token_id=0, bucket_size=384, compact_mask=False
+    calib_eval_features,
+    batch_size,
+    n_calib,
+    pad_token_id=0,
+    bucket_size=384,
+    compact_mask=False,
 ):
+    from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
+    from torch.nn.functional import pad
+     
+    bucket_size = 384 
     def bucket_pad(tensor):
         if bucket_size is None:
             return tensor
@@ -16,11 +25,18 @@ def make_packed_calib_data_loader(
         padding_size = bucket_size - tensor.shape[-1]
         return pad(tensor, (0, padding_size))
 
-    from furiosa_llm_models.generators.packing import \
-        greedy_attention_packing_bert
 
     data_list = []
     for feature in calib_eval_features:
+        input_ids = torch.LongTensor(feature.input_ids).unsqueeze(0).to(self.dev)
+        attention_mask = torch.LongTensor(feature.input_mask).unsqueeze(0).to(self.dev)
+        token_type_ids = torch.LongTensor(feature.segment_ids).unsqueeze(0).to(self.dev)
+        
+        padded_sequences={}
+        padded_sequences['input_ids'] =  input_ids 
+        padded_sequences['attention_mask'] = attention_mask
+        padded_sequences['token_type_ids'] = token_type_ids
+
         (
             input_ids,
             token_type_ids,
@@ -28,18 +44,18 @@ def make_packed_calib_data_loader(
             position_ids,
             packed_target_locations,
         ) = greedy_attention_packing_bert(
-            input_ids=torch.LongTensor(feature.input_ids).unsqueeze(0),
-            token_type_ids=torch.LongTensor(feature.segment_ids).unsqueeze(0),
-            bucketized_attention_mask=torch.LongTensor(feature.input_mask).unsqueeze(0),
+            input_ids=bucket_pad(padded_sequences["input_ids"]),
+            token_type_ids=bucket_pad(padded_sequences["token_type_ids"]),
+            bucketized_attention_mask=bucket_pad(padded_sequences["attention_mask"]),
             pad_token_id=pad_token_id,
             compact_mask=compact_mask,
         )
 
         model_inputs = {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids,
+            "input_ids": input_ids[0],
+            "token_type_ids": token_type_ids[0],
+            "attention_mask": attention_mask[0],
+            "position_ids": position_ids[0],
         }
         data_list.append(model_inputs)
 
@@ -47,7 +63,11 @@ def make_packed_calib_data_loader(
 
 
 def make_dataloader(
-    calib_eval_features , batch_size, n_calib, include_position_ids=False, compact_mask=False
+    calib_eval_features,
+    batch_size,
+    n_calib,
+    include_position_ids=False,
+    compact_mask=False,
 ):
     if compact_mask:
         raise NotImplementedError(
