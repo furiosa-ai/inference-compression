@@ -255,7 +255,7 @@ class SUT():
         if self.model_source == 'furiosa_llm_rope':
             from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
             self.gen_source  = 'GenerationMixin'
-        elif self.model_source == 'paged_attention_optimized_packed':
+        elif self.model_source == 'mlperf_submission':
             from furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope import LlamaForCausalLM
             self.gen_source = 'PagedAttentionPackedGenerator'
 
