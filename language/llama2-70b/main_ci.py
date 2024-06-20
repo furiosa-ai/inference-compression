@@ -246,7 +246,7 @@ def test_model_equivalence():
     
     # create quant golden model and activate dump mode
     mlperf_path = "./mlperf_dump"
-    mlperf_model = get_quant_model(model, args, immigrate=True)
+    mlperf_model = get_quant_model(model, args, immigrate_qparams=True)
     model_compressor.set_model_to_dump_golden_model(
         mlperf_path + '_prefill',
         mlperf_model.prefill,

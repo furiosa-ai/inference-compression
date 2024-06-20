@@ -48,7 +48,7 @@ def load_model_script(quant_config_path):
     return quant_config
 
 
-def get_quant_model(model, args, immigrate=False):
+def get_quant_model(model, args, immigrate_qparams=False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     quant_config = load_model_script(args.quant_config_path)
     
@@ -89,7 +89,7 @@ def get_quant_model(model, args, immigrate=False):
         kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16',
         disable_inout=(True, True),
         delete_org_weight=True,
-        immigrate=immigrate,
+        immigrate_qparams=immigrate_qparams,
     )
 
     decode_quantized_model = model_compressor.create_quantsim_model(
@@ -104,7 +104,7 @@ def get_quant_model(model, args, immigrate=False):
         decode_phase=True,
         quantized_prefill_model=prefill_quantized_model,
         delete_org_weight=True,
-        immigrate=immigrate,
+        immigrate_qparams=immigrate_qparams,
     )
 
     if model_type == furiosa_llm_models.llama.symbolic.mlperf_submission.LlamaForCausalLM:
