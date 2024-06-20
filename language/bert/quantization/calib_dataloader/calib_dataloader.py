@@ -7,7 +7,7 @@ from transformers import BertTokenizer
 
 
 def make_packed_calib_data_loader(
-    calib_eval_features , batch_size, n_calib, pad_token_id, bucket_size, compact_mask=False
+    calib_eval_features , batch_size, n_calib, pad_token_id=0, bucket_size=384, compact_mask=False
 ):
     def bucket_pad(tensor):
         if bucket_size is None:
