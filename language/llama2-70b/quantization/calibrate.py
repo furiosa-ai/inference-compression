@@ -55,7 +55,7 @@ def load_pytorch_model(model_source, model_path, use_gpu, n_layers):
     return model
 
 
-def cal_data_loader(model, model_source, data_path, batch_size, n_calib, max_seq_len=1024, use_generator_dataloader_with_unpacked_model=False):
+def make_calib_dataloader(model, model_source, data_path, batch_size, n_calib, max_seq_len=1024, use_generator_dataloader_with_unpacked_model=False):
     if not os.path.isfile(data_path):
         print("Calibration dataset {} not found. Please check that the path is correct".format(data_path))
     
@@ -94,7 +94,7 @@ def cal_data_loader(model, model_source, data_path, batch_size, n_calib, max_seq
 
 def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dataloader):
     if model_source == 'mlperf_submission':
-        model = model.trace_decode()
+        model = model.trace_prefill()
     else:
         model, _,_ = model_compressor.helper.llama_custom_symbolic_trace(
             model,
@@ -193,6 +193,9 @@ def main():
                 "Inference on a device other than GPU is not suppurted yet."
             )
         model = load_pytorch_model(args.model_source, args.model_path, args.gpu, args.n_layers)
+        if hasattr(model, 'hf_device_map'):
+            model.device_map = model.hf_device_map
+            model.module_name =  model.__class__.__module__ + "." + model.__class__.__name__
 
     else:
         raise ValueError("Unsupported backend: {:}".format(args.backend))
@@ -202,7 +205,7 @@ def main():
 
     with open(args.quant_config_path, "r") as f:
         qconfig = yaml.safe_load(f)
-    dataloader = cal_data_loader(
+    dataloader = make_calib_dataloader(
         model, args.model_source, args.calib_data_path, qconfig["calib_batch_size"], args.n_calib, use_generator_dataloader_with_unpacked_model=args.use_generator_dataloader_with_unpacked_model
     )
     calibrate(

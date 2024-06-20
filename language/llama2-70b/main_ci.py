@@ -9,7 +9,7 @@ from torch.nn.functional import pad
 import model_compressor
 from quantization.utils import get_kwargs, random_seed, set_optimization
 from quantization.get_quant_model import get_quant_model
-from quantization.calibrate import cal_data_loader, calibrate
+from quantization.calibrate import make_calib_dataloader, calibrate
 
 
 # Assume BLOCK_SIZE, NUM_BLOCKS, BUCKET_SIZE are fixed for now.
@@ -197,7 +197,7 @@ def test_model_equivalence():
         if 'qlevel' in qconfig:
             qconfig['qlevel'] = 2
             
-        dataloader = cal_data_loader(model, args.model_source, args.calib_data_path, qconfig["calib_batch_size"], args.n_calib)
+        dataloader = make_calib_dataloader(model, args.model_source, args.calib_data_path, qconfig["calib_batch_size"], args.n_calib)
         calibrate(
             model,
             args.model_source,
