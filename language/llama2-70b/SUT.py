@@ -5,7 +5,14 @@ import array
 import torch
 from torch.nn.functional import pad
 from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import accelerate
+import transformers
+
+
+from furiosa_llm_models.generators.symbolic.paged_attention_optimized_generator import (
+    PagedAttentionGenerator as TextGeneratorGreedySearch,
+)
 from transformers.generation.streamers import BaseStreamer
 
 import pickle
@@ -23,6 +30,9 @@ from dataset import Dataset
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Llama-70B-SUT")
+
+log.info(f"{transformers.__file__}")
+log.info(f"{accelerate.__file__}")
 
 gen_kwargs = {
     "early_stopping": True,
@@ -80,17 +90,20 @@ class FirstTokenStreamer(BaseStreamer):
 class SUT():
     def __init__(self,
                  model_path=None,
+                 model_source='furiosa_llm_rope',
                  dtype="bfloat16",
                  device="cpu",
                  batch_size=None,
                  total_sample_count=24576,
                  dataset_path=None,
                  use_cached_outputs=False,  # Set this to True *only for test accuracy runs* in case your prior session was killed partway through
+                 n_layers=-1,
                  workers=1):
 
         self.model_path = model_path or "meta-llama/Llama-2-70b-chat-hf"
+        self.model_source = model_source
         self.device = device
-
+        self.n_layers = n_layers
         if not batch_size:
             if device == "cpu":
                 batch_size = 1
@@ -193,13 +206,23 @@ class SUT():
 
                 tik2 = time.time()
 
-                pred_output_tokens = self.model.generate(
-                    input_ids=input_ids_tensor,
-                    attention_mask=input_masks_tensor,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    **gen_kwargs
-                )
-
+                
+                if self.gen_source == 'GenerationMixin':
+                    pred_output_tokens = self.model.generate(
+                        input_ids=input_ids_tensor,
+                        attention_mask=input_masks_tensor,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        **gen_kwargs)
+                elif self.gen_source == 'PagedAttentionPackedGenerator':
+                    pred_output_tokens = self.model.generate(
+                        input_ids=input_ids_tensor,
+                        attention_mask=input_masks_tensor,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        max_length=2048,
+                        **gen_kwargs)
+                else:
+                    NotImplemented
+                
                 tik3 = time.time()
 
                 processed_output = self.data_object.postProcess(pred_output_tokens,
@@ -228,12 +251,29 @@ class SUT():
 
 
     def load_model(self):
-        self.model = LlamaForCausalLM.from_pretrained(
-            self.model_path,
-            device_map="auto",
-            low_cpu_mem_usage=True,
-            torch_dtype=self.amp_dtype
-        )
+        if self.model_source == 'furiosa_llm_rope':
+            from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
+            self.gen_source  = 'GenerationMixin'
+        elif self.model_source == 'mlperf_submission':
+            from furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope import LlamaForCausalLM
+            self.gen_source = 'PagedAttentionPackedGenerator'
+
+        if self.n_layers > 0:
+            from transformers import AutoConfig
+            config_exp =  AutoConfig.from_pretrained(self.model_path)
+            config_exp.num_hidden_layers = self.n_layers
+            self.model = LlamaForCausalLM.from_pretrained(
+                self.model_path, 
+                device_map="auto",
+                config=config_exp
+                )
+        else:
+            self.model = LlamaForCausalLM.from_pretrained(
+                self.model_path,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                torch_dtype=self.amp_dtype
+            )
         print("Loaded model")
 
         self.device = torch.device(self.device)
