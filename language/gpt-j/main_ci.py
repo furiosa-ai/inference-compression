@@ -92,7 +92,6 @@ def compare_model_outputs():
     #for the sake of convenience 
     from furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu import GPTJForCausalLM
     config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
-    config.num_hidden_layers = 4
     hf_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
     
     
@@ -102,7 +101,7 @@ def compare_model_outputs():
     evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
     model_script_path = './ci_test_file/model_script.yaml'
     qformat_path = './ci_test_file/hf_qformat.yaml'
-    qparam_path = './ci_test_file/qparam.npy'
+    qparam_path = './ci_test_file/hf_qparam.npy'
     
     
     hf_rope_generator = quantization.get_quant_model(model = hf_model, 
