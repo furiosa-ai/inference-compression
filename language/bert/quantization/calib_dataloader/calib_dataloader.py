@@ -28,11 +28,11 @@ def make_packed_calib_data_loader(
             position_ids,
             packed_target_locations,
         ) = greedy_attention_packing_bert(
-            input_ids=torch.LongTensor(feature.input_ids),
-            token_type_ids=torch.LongTensor(feature.segment_ids),
-            bucketized_attention_mask=torch.LongTensor(feature.input_mask),
+            input_ids=torch.LongTensor(feature.input_ids).unsqueeze(0),
+            token_type_ids=torch.LongTensor(feature.segment_ids).unsqueeze(0),
+            bucketized_attention_mask=torch.LongTensor(feature.input_mask).unsqueeze(0),
             pad_token_id=pad_token_id,
-            compact_mask=False,
+            compact_mask=compact_mask,
         )
 
         model_inputs = {
