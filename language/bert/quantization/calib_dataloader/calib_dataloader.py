@@ -27,9 +27,9 @@ def make_packed_calib_data_loader(
 
     data_list = []
     for feature in calib_eval_features:
-        input_ids = torch.LongTensor(feature.input_ids).unsqueeze(0).to(self.dev)
-        attention_mask = torch.LongTensor(feature.input_mask).unsqueeze(0).to(self.dev)
-        token_type_ids = torch.LongTensor(feature.segment_ids).unsqueeze(0).to(self.dev)
+        input_ids = torch.LongTensor(feature.input_ids).unsqueeze(0)
+        attention_mask = torch.LongTensor(feature.input_mask).unsqueeze(0)
+        token_type_ids = torch.LongTensor(feature.segment_ids).unsqueeze(0)
         
         padded_sequences={}
         padded_sequences['input_ids'] =  input_ids 
