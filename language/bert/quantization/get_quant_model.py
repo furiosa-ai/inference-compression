@@ -16,7 +16,7 @@ def load_model_script(model_script_path):
     return model_script
 
 
-def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, output_path='./quantization/output'):
+def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, use_packed_dataloader=True, output_path='./quantization/output', qformat_path = None, qparam_path=None):
     #Load model script and calibration dataloader
     model_script = load_model_script(model_script_path)
     qlevel = model_script["qlevel"]
@@ -26,22 +26,26 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    qformat_path = f"{output_path}/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
-    qparam_path = f"{output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
+    if qformat_path is None:
+        qformat_path = f"{output_path}/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
+    
+    if qparam_path is None:
+        qparam_path = f"{output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
 
     
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
-        calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib)
-
         if model_source == 'mlperf_submission':
             from .calib_dataloader import make_packed_calib_data_loader
-            calib_dataloader = make_packed_calib_data_loader(calib_dataloader, 384, 0) 
-    
-    
-    
-    
+            if use_packed_dataloader:
+                calib_dataloader = make_packed_calib_data_loader(sut.qsl, model_script['calib_batch_size'], n_calib, pad_token_id=0, bucket_size=384, compact_mask=False) 
+            else:
+                calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib, include_position_ids=True)
+        else:            
+            calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib)
+           
+
     if calib_dataloader:
         #model_for_calib = symbolic_trace(sut.model, input_names=input_names, disable_check=False)
         model_for_calib = sut.model.trace()

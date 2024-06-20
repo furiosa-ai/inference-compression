@@ -1,11 +1,14 @@
 import os
-import torch
-from torch.utils.data import DataLoader
-from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
-from transformers import BertTokenizer
-from torch.nn.functional import pad
 
-def make_packed_calib_data_loader(calib_dataset, bucket_size, pad_token_id):
+import torch
+from torch.nn.functional import pad
+from torch.utils.data import DataLoader
+from transformers import BertTokenizer
+
+
+def make_packed_calib_data_loader(
+    qsl, batch_size, n_calib, pad_token_id, bucket_size, compact_mask=False
+):
     def bucket_pad(tensor):
         if bucket_size is None:
             return tensor
@@ -13,16 +16,25 @@ def make_packed_calib_data_loader(calib_dataset, bucket_size, pad_token_id):
         padding_size = bucket_size - tensor.shape[-1]
         return pad(tensor, (0, padding_size))
 
+    from furiosa_llm_models.generators.packing import \
+        greedy_attention_packing_bert
+
+    calib_eval_features = load_bert_calibration_data(qsl, n_calib)
+
     data_list = []
-    for batch in calib_dataset:
-        input_ids, token_type_ids, attention_mask, position_ids, packed_target_locations = (
-            greedy_attention_packing_bert(
-                input_ids=bucket_pad(batch["input_ids"]),
-                token_type_ids=bucket_pad(batch["token_type_ids"]),
-                bucketized_attention_mask=bucket_pad(batch["attention_mask"]),
-                pad_token_id=pad_token_id,
-                compact_mask=False,
-            )
+    for feature in calib_eval_features:
+        (
+            input_ids,
+            token_type_ids,
+            attention_mask,
+            position_ids,
+            packed_target_locations,
+        ) = greedy_attention_packing_bert(
+            input_ids=torch.LongTensor(feature.input_ids),
+            token_type_ids=torch.LongTensor(feature.segment_ids),
+            bucketized_attention_mask=torch.LongTensor(feature.input_mask),
+            pad_token_id=pad_token_id,
+            compact_mask=False,
         )
 
         model_inputs = {
@@ -33,37 +45,62 @@ def make_packed_calib_data_loader(calib_dataset, bucket_size, pad_token_id):
         }
         data_list.append(model_inputs)
 
-    return DataLoader(data_list)
+    return DataLoader(data_list, batch_size=batch_size)
 
 
+def make_dataloader(
+    qsl, batch_size, n_calib, include_position_ids=False, compact_mask=False
+):
+    if compact_mask:
+        raise NotImplementedError(
+            "We have not yet implemented support for the compact_mask feature."
+        )
 
-def make_dataloader(qsl, batch_size, n_calib):
+    calib_eval_features = load_bert_calibration_data(qsl, n_calib)
+    data_list = []
+    for feature in calib_eval_features:
+        data = {
+            "input_ids": torch.LongTensor(feature.input_ids),
+            "attention_mask": torch.LongTensor(feature.input_mask),
+            "token_type_ids": torch.LongTensor(feature.segment_ids),
+        }
 
+        if include_position_ids:
+            data.update(
+                {
+                    "attention_mask": data["attention_mask"]
+                    .unsqueeze(0)
+                    .repeat(384, 1),
+                    "position_ids": torch.arange(384),
+                }
+            )
+
+        data_list.append(data)
+
+    dataloader = DataLoader(data_list, batch_size=batch_size)
+
+    return dataloader
+
+
+def load_bert_calibration_data(qsl, n_calib):
     file_path = os.path.join(
-        os.path.realpath(__file__)[0:os.path.realpath(__file__).find('language')], 
-        'calibration', 
-        'SQuAD-v1.1',
-        'bert_calibration_features.txt',)
-    with open(file_path, 'r') as fp:
+        os.path.realpath(__file__)[0 : os.path.realpath(__file__).find("language")],
+        "calibration",
+        "SQuAD-v1.1",
+        "bert_calibration_features.txt",
+    )
+
+    with open(file_path, "r") as fp:
         lines = fp.readlines()
 
     calib_data_indice_list = []
     for line in lines:
-        numbers = [int(num) for num in line.split('\n') if num.isdigit()]
+        numbers = [int(num) for num in line.split("\n") if num.isdigit()]
         calib_data_indice_list.extend(numbers)
-    
+
     calib_eval_features = [qsl.eval_features[i] for i in calib_data_indice_list]
 
-    data_list = []
     if n_calib != -1:
         calib_eval_features = calib_eval_features[0:n_calib]
-    for feature in calib_eval_features:
-        data_list.append({
-            'input_ids': torch.LongTensor(feature.input_ids),
-            'attention_mask': torch.LongTensor(feature.input_mask),
-            'token_type_ids': torch.LongTensor(feature.segment_ids),
-        })
-    
-    dataloader = DataLoader(data_list, batch_size=batch_size)
 
-    return dataloader
+    return calib_eval_features
