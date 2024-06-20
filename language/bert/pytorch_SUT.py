@@ -102,14 +102,12 @@ class BERT_PyTorch_SUT():
             segment_ids = sample_input.segment_ids
 
 
-        # Reformatting
-        input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(self.dev)
-        attention_mask = torch.LongTensor(input_mask).unsqueeze(0).to(self.dev)
-        token_type_ids = torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev)
-    
-        
         with torch.no_grad():
             if self.model_source == 'huggingface_rngd_gelu':
+                input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(self.dev)
+                attention_mask = torch.LongTensor(input_mask).unsqueeze(0).to(self.dev)
+                token_type_ids = torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev)
+                
                 if self.debug_mode:
                     # 첫번째 샘플에 대해서 비교 진행
                     self.save_test_sample(sample={'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids':token_type_ids})
@@ -118,6 +116,21 @@ class BERT_PyTorch_SUT():
                                                     attention_mask=attention_mask,
                                                     token_type_ids=token_type_ids)
             elif self.model_source == 'mlperf_submission':
+                from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
+                from torch.nn.functional import pad
+                
+                bucket_size = 384  
+                def bucket_pad(tensor):
+                    if bucket_size is None:
+                        return tensor
+    
+                    padding_size = bauket_size - tensor.shape[-1]
+                    return pad(tensor, (0, padding_size))
+                    
+                input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(self.dev)
+                attention_mask = torch.LongTensor(input_mask).unsqueeze(0).to(self.dev)
+                token_type_ids = torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev)
+                
                 padded_sequences={}
                 padded_sequences['input_ids'] =  input_ids 
                 padded_sequences['attention_mask'] = attention_mask
@@ -136,20 +149,13 @@ class BERT_PyTorch_SUT():
                 # accuracy 측정 작업을 수행하려면 logit값이 필요하기 때문에, 현재 generator를 사용할 수 없음.   
                 # generator.generate return형태 수정 전까지 아래 코드 사용    
                 # --------------------------------------------------------------------------------------
-                from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
-                from torch.nn.functional import pad
+
                 
                 if self.use_packed_data:
-                    def bucket_pad(tensor):
-                        """
-                        huggingface dataloader의 seq_length로 설정. 
-                        padding_size=0로 실제로 padding은 수행되지 않음.
-                        """
-                        bauket_size = 384 
-                        padding_size = bauket_size - tensor.shape[-1]
-                        return pad(tensor, (0, padding_size))
-                    
-
+                    """
+                    huggingface dataloader의 seq_length로 설정. 
+                    padding_size=0로 실제로 padding은 수행되지 않음.
+                    """                  
                     input_ids, token_type_ids, attention_mask, position_ids, packed_target_locations = (
                         greedy_attention_packing_bert(
                             input_ids=bucket_pad(padded_sequences["input_ids"]),
