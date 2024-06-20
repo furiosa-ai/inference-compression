@@ -193,6 +193,9 @@ def main():
                 "Inference on a device other than GPU is not suppurted yet."
             )
         model = load_pytorch_model(args.model_source, args.model_path, args.gpu, args.n_layers)
+        if hasattr(model, 'hf_device_map'):
+            model.device_map = model.hf_device_map
+            model.module_name =  model.__class__.__module__ + "." + model.__class__.__name__
 
     else:
         raise ValueError("Unsupported backend: {:}".format(args.backend))
