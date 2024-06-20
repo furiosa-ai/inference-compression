@@ -80,7 +80,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
 
@@ -240,6 +240,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             # decode_phase = True,
             delete_org_weight=True,
+            immigrate_qparams = immigrate_qparams,
         )
 
         decode_model = model_compressor.create_quantsim_model(
@@ -263,6 +264,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             decode_phase = True,
             delete_org_weight=True,
             quantized_prefill_model=prefill_model,
+            immigrate_qparams = immigrate_qparams,
         )
 
         quant_models = {
