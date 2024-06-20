@@ -7,7 +7,7 @@ from transformers import BertTokenizer
 
 
 def make_packed_calib_data_loader(
-    qsl, batch_size, n_calib, pad_token_id, bucket_size, compact_mask=False
+    calib_eval_features , batch_size, n_calib, pad_token_id, bucket_size, compact_mask=False
 ):
     def bucket_pad(tensor):
         if bucket_size is None:
@@ -18,8 +18,6 @@ def make_packed_calib_data_loader(
 
     from furiosa_llm_models.generators.packing import \
         greedy_attention_packing_bert
-
-    calib_eval_features = load_bert_calibration_data(qsl, n_calib)
 
     data_list = []
     for feature in calib_eval_features:
@@ -49,14 +47,13 @@ def make_packed_calib_data_loader(
 
 
 def make_dataloader(
-    qsl, batch_size, n_calib, include_position_ids=False, compact_mask=False
+    calib_eval_features , batch_size, n_calib, include_position_ids=False, compact_mask=False
 ):
     if compact_mask:
         raise NotImplementedError(
             "We have not yet implemented support for the compact_mask feature."
         )
 
-    calib_eval_features = load_bert_calibration_data(qsl, n_calib)
     data_list = []
     for feature in calib_eval_features:
         data = {

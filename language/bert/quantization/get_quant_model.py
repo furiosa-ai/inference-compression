@@ -36,14 +36,17 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
     else:
+        from .calib_dataloader import load_bert_calibration_data
+        calib_eval_features = load_bert_calibration_data(sut.qsl, n_calib)
+        
         if model_source == 'mlperf_submission':
             from .calib_dataloader import make_packed_calib_data_loader
             if use_packed_dataloader:
-                calib_dataloader = make_packed_calib_data_loader(sut.qsl, model_script['calib_batch_size'], n_calib, pad_token_id=0, bucket_size=384, compact_mask=False) 
+                calib_dataloader = make_packed_calib_data_loader(calib_eval_features, model_script['calib_batch_size'], n_calib, pad_token_id=0, bucket_size=384, compact_mask=False) 
             else:
-                calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib, include_position_ids=True)
+                calib_dataloader = make_dataloader(calib_eval_features, model_script['calib_batch_size'], n_calib, include_position_ids=True)
         else:            
-            calib_dataloader = make_dataloader(sut.qsl, model_script['calib_batch_size'], n_calib)
+            calib_dataloader = make_dataloader(calib_eval_features, model_script['calib_batch_size'], n_calib)
            
 
     if calib_dataloader:
