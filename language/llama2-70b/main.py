@@ -32,7 +32,7 @@ def get_args():
                         choices=[
                             "furiosa_llm_rope", 
                             "preallocated_concat_rope", 
-                            "paged_attention_optimized_packed"
+                            "mlperf_submission"
                             ], 
                         default="furiosa_llm_rope", 
                         help="the type of GPTJForCausalLM to use")
