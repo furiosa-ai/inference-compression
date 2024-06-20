@@ -19,7 +19,13 @@ import array
 import json
 import os
 import sys
-sys.path.insert(0, os.path.join(os.getcwd(), "DeepLearningExamples", "PyTorch", "LanguageModeling", "BERT"))
+
+sys.path.insert(
+    0,
+    os.path.join(
+        os.getcwd(), "DeepLearningExamples", "PyTorch", "LanguageModeling", "BERT"
+    ),
+)
 sys.path.insert(0, os.getcwd())
 
 import mlperf_loadgen as lg
@@ -30,7 +36,8 @@ from transformers import BertConfig
 
 from squad_QSL import get_squad_QSL
 
-class BERT_PyTorch_SUT():
+
+class BERT_PyTorch_SUT:
     def __init__(self, args):
         print("Loading BERT configs...")
         with open("bert_config.json") as f:
@@ -50,29 +57,36 @@ class BERT_PyTorch_SUT():
             num_attention_heads=config_json["num_attention_heads"],
             num_hidden_layers=config_json["num_hidden_layers"],
             type_vocab_size=config_json["type_vocab_size"],
-            vocab_size=config_json["vocab_size"])
+            vocab_size=config_json["vocab_size"],
+        )
 
         self.network = args.network
-        self.dev = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        self.dev = (
+            torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        )
         self.version = transformers.__version__
         self.model_source = args.model_source
-        # ---------------------------------------------------------
-        self.use_packed_data = True  # Generator return 형태 수정 후, 제거
-        # ---------------------------------------------------------
         self.debug_mode = False
-        self.debug_test_sample=None
-        
+        self.debug_test_sample = None
+
         print("Loading PyTorch model...")
-        
-        if self.model_source == 'huggingface_rngd_gelu':
-            from furiosa_llm_models.bert.symbolic.huggingface_rngd_gelu import BertForQuestionAnswering
-        elif self.model_source == 'mlperf_submission':
-            from furiosa_llm_models.bert.symbolic.mlperf_submission import BertForQuestionAnswering
-        
+
+        if self.model_source == "huggingface_rngd_gelu":
+            from furiosa_llm_models.bert.symbolic.huggingface_rngd_gelu import (
+                BertForQuestionAnswering,
+            )
+        elif self.model_source == "mlperf_submission":
+            from furiosa_llm_models.bert.symbolic.mlperf_submission import (
+                BertForQuestionAnswering,
+            )
+
         self.model = BertForQuestionAnswering(config)
         self.model.to(self.dev)
         self.model.eval()
-        model_file = os.environ.get("ML_MODEL_FILE_WITH_PATH", "build/data/bert_tf_v1_1_large_fp32_384_v2/model.pytorch")
+        model_file = os.environ.get(
+            "ML_MODEL_FILE_WITH_PATH",
+            "build/data/bert_tf_v1_1_large_fp32_384_v2/model.pytorch",
+        )
         self.model.load_state_dict(torch.load(model_file), strict=False)
 
         print("Constructing SUT...")
@@ -86,133 +100,104 @@ class BERT_PyTorch_SUT():
             eval_features = self.qsl.get_features(query_samples[i].index)
             self.process_sample(eval_features, query_samples[i].id)
 
-    def save_test_sample(self, sample:dict):
+    def save_test_sample(self, sample: dict):
         if self.debug_test_sample is None:
             self.debug_test_sample = sample
-        
-    def process_sample(self, sample_input, query_id = None):
 
+    def process_sample(self, sample_input, query_id=None):
         if self.network == "sut":
-            input_ids = sample_input['input_ids']
-            input_mask = sample_input['input_mask']
-            segment_ids = sample_input['segment_ids']
+            input_ids = sample_input["input_ids"]
+            input_mask = sample_input["input_mask"]
+            segment_ids = sample_input["segment_ids"]
         else:
             input_ids = sample_input.input_ids
             input_mask = sample_input.input_mask
             segment_ids = sample_input.segment_ids
 
+        # Reformatting
+        input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(self.dev)
+        attention_mask = torch.LongTensor(input_mask).unsqueeze(0).to(self.dev)
+        token_type_ids = torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev)
 
         with torch.no_grad():
-            if self.model_source == 'huggingface_rngd_gelu':
-                input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(self.dev)
-                attention_mask = torch.LongTensor(input_mask).unsqueeze(0).to(self.dev)
-                token_type_ids = torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev)
-                
+            if self.model_source == "huggingface_rngd_gelu":
                 if self.debug_mode:
                     # 첫번째 샘플에 대해서 비교 진행
-                    self.save_test_sample(sample={'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids':token_type_ids})
-                
-                model_output = self.model.forward(input_ids=input_ids,
-                                                    attention_mask=attention_mask,
-                                                    token_type_ids=token_type_ids)
-            elif self.model_source == 'mlperf_submission':
-                from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
-                from torch.nn.functional import pad
-                
-                bucket_size = 384  
-                def bucket_pad(tensor):
-                    if bucket_size is None:
-                        return tensor
-    
-                    padding_size = bauket_size - tensor.shape[-1]
-                    return pad(tensor, (0, padding_size))
-                    
-                input_ids = torch.LongTensor(input_ids).unsqueeze(0).to(self.dev)
-                attention_mask = torch.LongTensor(input_mask).unsqueeze(0).to(self.dev)
-                token_type_ids = torch.LongTensor(segment_ids).unsqueeze(0).to(self.dev)
-                
-                padded_sequences={}
-                padded_sequences['input_ids'] =  input_ids 
-                padded_sequences['attention_mask'] = attention_mask
-                padded_sequences['token_type_ids'] = token_type_ids
-                
-                # --------------------------------------------------------------------------------------
-                # from furiosa_llm_models.generators.bert_generator import BertUnsplitPackedGenerator
-                # generator = BertUnsplitPackedGenerator(model=model, compact_mask=False)
-                # output = generator.generate(
-                #     **padded_sequences,
-                #     bucket_size=384,
-                #     pad_token_id=0,
-                # )
-                # --------------------------------------------------------------------------------------
-        
-                # accuracy 측정 작업을 수행하려면 logit값이 필요하기 때문에, 현재 generator를 사용할 수 없음.   
-                # generator.generate return형태 수정 전까지 아래 코드 사용    
-                # --------------------------------------------------------------------------------------
-
-                
-                if self.use_packed_data:
-                    """
-                    huggingface dataloader의 seq_length로 설정. 
-                    padding_size=0로 실제로 padding은 수행되지 않음.
-                    """                  
-                    input_ids, token_type_ids, attention_mask, position_ids, packed_target_locations = (
-                        greedy_attention_packing_bert(
-                            input_ids=bucket_pad(padded_sequences["input_ids"]),
-                            token_type_ids=bucket_pad(padded_sequences["token_type_ids"]),
-                            bucketized_attention_mask=bucket_pad(padded_sequences["attention_mask"]),
-                            pad_token_id=0,
-                            compact_mask=False,
-                        )
+                    self.save_test_sample(
+                        sample={
+                            "input_ids": input_ids,
+                            "attention_mask": attention_mask,
+                            "token_type_ids": token_type_ids,
+                        }
                     )
-                else:
-                    input_ids = padded_sequences['input_ids']
-                    token_type_ids = padded_sequences['token_type_ids']
-                    attention_mask = padded_sequences['attention_mask'].unsqueeze(0).repeat((1,384,1))
-                    position_ids = torch.arange(384).unsqueeze(0).to(self.dev)
-                    
-                # --------------------------------------------------------------------------------------
 
-                if self.debug_mode:
-                    # 첫번째 샘플에 대해서 비교 진행
-                    self.save_test_sample(sample={'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids':token_type_ids, 'position_ids': position_ids})
-                    
-                model_output = self.model(
+                model_output = self.model.forward(
                     input_ids=input_ids,
-                    token_type_ids=token_type_ids,
                     attention_mask=attention_mask,
-                    position_ids=position_ids
-                    )
-                
+                    token_type_ids=token_type_ids,
+                )
+            elif self.model_source == "mlperf_submission":
+                padded_sequences = {}
+                padded_sequences["input_ids"] = input_ids
+                padded_sequences["attention_mask"] = attention_mask
+                padded_sequences["token_type_ids"] = token_type_ids
 
-            if self.version >= '4.0.0':
+                from furiosa_llm_models.generators.bert_generator import (
+                    BertUnsplitPackedGenerator,
+                )
+
+                if self.debug_mode:
+                    # 첫번째 샘플에 대해서 비교 진행
+                    self.save_test_sample(
+                        sample={
+                            "input_ids": input_ids,
+                            "attention_mask": attention_mask,
+                            "token_type_ids": token_type_ids,
+                        }
+                    )
+
+                generator = BertUnsplitPackedGenerator(
+                    model=self.model, compact_mask=False
+                )
+                model_output = generator.generate(
+                    **padded_sequences,
+                    bucket_size=384,
+                    pad_token_id=0,
+                )
+
+            if self.version >= "4.0.0":
                 if self.model_source == "huggingface_rngd_gelu":
-                    start_scores = model_output['start_logits']
-                    end_scores = model_output['end_logits']
+                    start_scores = model_output["start_logits"]
+                    end_scores = model_output["end_logits"]
                 elif self.model_source == "mlperf_submission":
-                    start_scores = model_output[:,:,0]
-                    end_scores = model_output[:,:,1]
+                    start_scores = model_output[0][:, 0]  # batch_size=1 가정.
+                    end_scores = model_output[0][:, 1]
                 else:
                     NotImplemented
-                    
+
             else:
                 start_scores, end_scores = model_output
-            output = torch.stack([start_scores, end_scores], axis=-1).squeeze(0).cpu().numpy()
+            output = (
+                torch.stack([start_scores, end_scores], axis=-1)
+                .squeeze(0)
+                .cpu()
+                .numpy()
+            )
 
             if self.network == "sut":
                 return output.tolist()
-    
+
             response_array = array.array("B", output.tobytes())
             bi = response_array.buffer_info()
             response = lg.QuerySampleResponse(query_id, bi[0], bi[1])
             lg.QuerySamplesComplete([response])
-
 
     def flush_queries(self):
         pass
 
     def __del__(self):
         print("Finished destroying SUT.")
+
 
 def get_pytorch_sut(args):
     return BERT_PyTorch_SUT(args)

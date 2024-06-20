@@ -326,24 +326,24 @@ def is_logit_same(
     batch_size = golden_input_ids.shape[0]
 
     for batch_idx in range(batch_size):
+        max_seq_length = golden_input_ids[batch_idx].shape[0]
         golden_extract_nonzero_locations = torch.nonzero(golden_input_ids[batch_idx])
-        comparison_extract_nonzero_locations = torch.nonzero(
-            comparison_input_ids[batch_idx]
-        )
 
         golden_valid_seq_length = (
             int(golden_extract_nonzero_locations[-1] + 1)
             - golden_extract_nonzero_locations[0]
         )
-        comparison_valid_seq_length = int(
-            comparison_extract_nonzero_locations[-1] + 1
-        ) - int(comparison_extract_nonzero_locations[0])
 
-        if (
-            golden_valid_seq_length == 0
-            or golden_valid_seq_length != comparison_valid_seq_length
-        ):
+        if golden_valid_seq_length == 0:
             raise ValueError("Invalid target locations.")
+
+        # mlperf_submission 모델의 input preprocessing은 generator 내부에서 이루어지므로,
+        # golden valid seq length를 기준으로 comparison_output의 valid location 추출.
+
+        comparison_extract_nonzero_locations = [
+            (max_seq_length - 1) - golden_valid_seq_length + 1,
+            max_seq_length - 1,
+        ]
 
         device = golden_output.device
         valid_golden_output = golden_output[
@@ -423,9 +423,6 @@ def test_model_equivalence():
         use_packed_dataloader=False,
         output_path=mlperf_output_path,
     )
-    # ---------------------------------------------------------
-    sut.use_packed_data = True  # Generator return 형태 수정 후, 제거
-    # ---------------------------------------------------------
     mlperf_model_test_sample = dump_using_mlperf_loadgens(
         args, sut, dumpfile_path=mlperf_dump_file_path
     )
