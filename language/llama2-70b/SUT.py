@@ -10,7 +10,6 @@ import accelerate
 import transformers
 
 
-from furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope import LlamaForCausalLM
 from furiosa_llm_models.generators.symbolic.paged_attention_optimized_generator import (
     PagedAttentionGenerator as TextGeneratorGreedySearch,
 )
