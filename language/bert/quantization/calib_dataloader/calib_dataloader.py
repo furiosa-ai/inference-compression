@@ -17,7 +17,6 @@ def make_packed_calib_data_loader(
     from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
     from torch.nn.functional import pad
      
-    bucket_size = 384 
     def bucket_pad(tensor):
         if bucket_size is None:
             return tensor
