@@ -48,13 +48,13 @@ def load_model_script(quant_config_path):
     return quant_config
 
 
-def get_quant_model(model, args):
+def get_quant_model(model, args, immigrate=False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     quant_config = load_model_script(args.quant_config_path)
     
     model_type = type(model)
 
-    if model_type == furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope.LlamaForCausalLM:
+    if model_type == furiosa_llm_models.llama.symbolic.mlperf_submission.LlamaForCausalLM:
         
         prefill_model = model.trace_prefill()
         decode_model = model.trace_decode()
@@ -88,8 +88,8 @@ def get_quant_model(model, args):
         act_zp_equalizing=(quant_config["act_zp_equalizing"] if quant_config["act_zp_equalizing"] else 'disabled'),
         kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16',
         disable_inout=(True, True),
-        weighted_op_emul_dtype=args.weighted_op_emul_dtype,
         delete_org_weight=True,
+        immigrate=immigrate,
     )
 
     decode_quantized_model = model_compressor.create_quantsim_model(
@@ -102,18 +102,16 @@ def get_quant_model(model, args):
         kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16',
         disable_inout=(True, True),
         decode_phase=True,
-        weighted_op_emul_dtype=args.weighted_op_emul_dtype,
         quantized_prefill_model=prefill_quantized_model,
         delete_org_weight=True,
+        immigrate=immigrate,
     )
 
-    if model_type == furiosa_llm_models.llama.symbolic.paged_attention_optimized_packed_rope.LlamaForCausalLM:
-        from furiosa_llm_models.generators.symbolic.paged_attention_optimized_generator import (
-            PagedAttentionGenerator as TextGeneratorGreedySearch,
-        )
+    if model_type == furiosa_llm_models.llama.symbolic.mlperf_submission.LlamaForCausalLM:
+        from furiosa_llm_models.generators.symbolic.llama_multi_gpu_paged_attention_optimized_generator import PagedAttentionGenerator
         kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16'
 
-        generator = TextGeneratorGreedySearch(
+        generator = PagedAttentionGenerator(
             prefill=prefill_quantized_model,
             decode=decode_quantized_model,
             kv_dtype=torch.int8 if kv_dtype == 'int8' else torch.bfloat16,
