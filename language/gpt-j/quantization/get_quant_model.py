@@ -80,12 +80,9 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
-
-    qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
-    qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
     
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
@@ -98,7 +95,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
-        # elif type(model) == furiosa_llm_models.gptj.paged_attention_rope
+        # elif type(model) == furiosa_llm_models.gptj.paged_attentin_rope
         
         else:
             from .calibration_utils.make_calib_dataloader import make_calib_dataloader
@@ -238,8 +235,9 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             dataloader=None,
             disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-            decode_phase = False,
+            # decode_phase = True,
             delete_org_weight=True,
+            immigrate_qparams = immigrate_qparams,
         )
 
         decode_model = model_compressor.create_quantsim_model(
@@ -263,6 +261,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             decode_phase = True,
             delete_org_weight=True,
             quantized_prefill_model=prefill_model,
+            immigrate_qparams = immigrate_qparams,
         )
 
         quant_models = {

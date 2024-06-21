@@ -159,7 +159,7 @@ class SUT_base():
                 output_batch = self.model.generate(input_batch, **gen_kwargs)
             elif self.gen_source == 'QuantPreAllocatedGenerator':  
                 output_batch = self.model.generate(input_batch, **gen_kwargs)
-            elif self.gen_source == 'PagedAttentionPackedGenerator':
+            elif self.gen_source == 'MLPerf_submision_generator':
                 output_batch = self.model.generate(**input_batch, max_length=2048, **gen_kwargs)
             else:
                 raise NotImplementedError
