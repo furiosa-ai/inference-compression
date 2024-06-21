@@ -7,16 +7,21 @@ from transformers import BertTokenizer
 
 
 def make_packed_calib_data_loader(
-    calib_eval_features,
+    data_list,
     batch_size,
     n_calib,
     pad_token_id=0,
     bucket_size=384,
     compact_mask=False,
 ):
-    from furiosa_llm_models.generators.packing import greedy_attention_packing_bert
+    """
+    data_list: list of dict. dict_keys=["input_ids","token_type_ids", "attention_mask"]
+    """
+
+    from furiosa_llm_models.generators.packing import \
+        greedy_attention_packing_bert
     from torch.nn.functional import pad
-     
+
     def bucket_pad(tensor):
         if bucket_size is None:
             return tensor
@@ -24,18 +29,7 @@ def make_packed_calib_data_loader(
         padding_size = bucket_size - tensor.shape[-1]
         return pad(tensor, (0, padding_size))
 
-
-    data_list = []
-    for feature in calib_eval_features:
-        input_ids = torch.LongTensor(feature.input_ids).unsqueeze(0)
-        attention_mask = torch.LongTensor(feature.input_mask).unsqueeze(0)
-        token_type_ids = torch.LongTensor(feature.segment_ids).unsqueeze(0)
-        
-        padded_sequences={}
-        padded_sequences['input_ids'] =  input_ids 
-        padded_sequences['attention_mask'] = attention_mask
-        padded_sequences['token_type_ids'] = token_type_ids
-
+    for data in data_list:
         (
             input_ids,
             token_type_ids,
@@ -43,45 +37,42 @@ def make_packed_calib_data_loader(
             position_ids,
             packed_target_locations,
         ) = greedy_attention_packing_bert(
-            input_ids=bucket_pad(padded_sequences["input_ids"]),
-            token_type_ids=bucket_pad(padded_sequences["token_type_ids"]),
-            bucketized_attention_mask=bucket_pad(padded_sequences["attention_mask"]),
+            input_ids=bucket_pad(data["input_ids"].unsqueeze(0)),
+            token_type_ids=bucket_pad(data["token_type_ids"].unsqueeze(0)),
+            bucketized_attention_mask=bucket_pad(data["attention_mask"].unsqueeze(0)),
             pad_token_id=pad_token_id,
             compact_mask=compact_mask,
         )
 
-        model_inputs = {
-            "input_ids": input_ids[0],
-            "token_type_ids": token_type_ids[0],
-            "attention_mask": attention_mask[0],
-            "position_ids": position_ids[0],
-        }
-        data_list.append(model_inputs)
+        data.update(
+            {
+                "input_ids": input_ids[0],
+                "token_type_ids": token_type_ids[0],
+                "attention_mask": attention_mask[0],
+                "position_ids": position_ids[0],
+            }
+        )
 
     return DataLoader(data_list, batch_size=batch_size)
 
 
 def make_dataloader(
-    calib_eval_features,
+    data_list,
     batch_size,
     n_calib,
     include_position_ids=False,
     compact_mask=False,
 ):
+    """
+    data_list: list of dict. dict_keys=["input_ids","token_type_ids", "attention_mask"]
+    """
     if compact_mask:
         raise NotImplementedError(
             "We have not yet implemented support for the compact_mask feature."
         )
 
-    data_list = []
-    for feature in calib_eval_features:
-        data = {
-            "input_ids": torch.LongTensor(feature.input_ids),
-            "attention_mask": torch.LongTensor(feature.input_mask),
-            "token_type_ids": torch.LongTensor(feature.segment_ids),
-        }
-
-        if include_position_ids:
+    if include_position_ids:
+        for data in data_list:
             data.update(
                 {
                     "attention_mask": data["attention_mask"]
@@ -91,10 +82,7 @@ def make_dataloader(
                 }
             )
 
-        data_list.append(data)
-
     dataloader = DataLoader(data_list, batch_size=batch_size)
-
     return dataloader
 
 
@@ -119,4 +107,14 @@ def load_bert_calibration_data(qsl, n_calib):
     if n_calib != -1:
         calib_eval_features = calib_eval_features[0:n_calib]
 
-    return calib_eval_features
+    data_list = []
+    for feature in calib_eval_features:
+        data_list.append(
+            {
+                "input_ids": torch.LongTensor(feature.input_ids),
+                "attention_mask": torch.LongTensor(feature.input_mask),
+                "token_type_ids": torch.LongTensor(feature.segment_ids),
+            }
+        )
+
+    return data_list

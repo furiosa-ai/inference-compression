@@ -118,13 +118,9 @@ def get_args():
     )
     parser.add_argument(
         "--model_source",
-        default="mlperf_submission",
+        default="unsplit_packed",
         type=str,
-        choices=[
-            "huggingface_rngd_gelu",
-            "mlperf_submission",
-            "experimental_huggingface_unsplit_packed",
-        ],
+        choices=["huggingface_rngd_gelu", "mlperf_submission","compact_causal_mask"],
         help="choose model source",
     )
 
@@ -199,7 +195,7 @@ def dump_using_mlperf_loadgens(args, sut, dumpfile_path):
     # Enable debug mode
     # ---------------------------------------------------------
     sut.debug_mode = True
-    if args.model_source == "mlperf_submission":
+    if args.model_source in ["mlperf_submission",  "compact_causal_mask"]:
         quant_model = sut.model.model
     else:
         quant_model = sut.model
@@ -234,7 +230,9 @@ def is_qparam_same(
 ):
     import numpy as np
 
-    golden_qparam_path = f"{golden_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
+    golden_qparam_path = (
+        f"{golden_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
+    )
     comparison_qparam_path = f"{comparison_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
 
     golden_qparam = np.load(golden_qparam_path, allow_pickle=True).item()
@@ -394,11 +392,9 @@ def test_model_equivalence():
     from pytorch_SUT import get_pytorch_sut
 
     golden_output_path, comparison_output_path = set_output_path_for_qformat_qparam(
-        args.model_script_path, args.recalibrate, output_path="./test/mlperf_submission"
+        args.model_script_path, args.recalibrate, output_path='./test/compact_causal_mask'
     )
-    golden_dump_file_path, comparison_dump_file_path = set_dump_file_path(
-        dump_file_folder="./test/mlperf_submission/dumped"
-    )
+    golden_dump_file_path, comparison_dump_file_path = set_dump_file_path(dump_file_folder='./test/compact_causal_mask/dumped')
 
     # ---------------------------------------------------------
     # Dump golden model
@@ -419,7 +415,7 @@ def test_model_equivalence():
     )
 
     # ---------------------------------------------------------
-    # Dump mlperf_submission model
+    # Get Qparam from mlperf_submission model
     # ---------------------------------------------------------
     args.model_source = "mlperf_submission"
     sut = get_pytorch_sut(args)
@@ -432,10 +428,27 @@ def test_model_equivalence():
         use_packed_dataloader=False,
         output_path=comparison_output_path,
     )
+
+    # ---------------------------------------------------------
+    # Dump experimental/huggingface_unsplit_packed model (compact causal mask)
+    # ---------------------------------------------------------
+    args.model_source = "compact_causal_mask"
+    args.recalibrate = False
+    sut = get_pytorch_sut(args)
+    sut.model = get_quant_model(
+        sut,
+        args.model_source,
+        args.model_script_path,
+        args.n_calib,
+        args.recalibrate,
+        use_packed_dataloader=True,
+        output_path=comparison_output_path,
+    )
+    
     comparison_model_test_sample = dump_using_mlperf_loadgens(
         args, sut, dumpfile_path=comparison_dump_file_path
     )
-
+    
     # ---------------------------------------------------------
     # Compare Qparam and logits
     # Bert는 qparam migration 작업을 수행하지 않으므로, qparam 비교 작업도 ci test상에서 수행.
