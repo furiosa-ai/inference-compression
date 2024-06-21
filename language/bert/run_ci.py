@@ -120,7 +120,11 @@ def get_args():
         "--model_source",
         default="unsplit_packed",
         type=str,
-        choices=["huggingface_rngd_gelu", "mlperf_submission"],
+        choices=[
+            "huggingface_rngd_gelu",
+            "mlperf_submission",
+            "experimental_huggingface_unsplit_packed",
+        ],
         help="choose model source",
     )
 
@@ -136,23 +140,23 @@ scenario_map = {
 }
 
 
-def set_dump_file_path(dump_file_folder="./test/dumped"):
+def set_dump_file_path(dump_file_folder):
     if not os.path.exists(dump_file_folder):
         os.makedirs(dump_file_folder)
 
-    golden_dump_file_path = os.path.join(dump_file_folder, "hf.pkl")
-    mlperf_dump_file_path = os.path.join(dump_file_folder, "mlperf.pkl")
-    return golden_dump_file_path, mlperf_dump_file_path
+    golden_dump_file_path = os.path.join(dump_file_folder, "golden.pkl")
+    comparison_dump_file_path = os.path.join(dump_file_folder, "comparison.pkl")
+    return golden_dump_file_path, comparison_dump_file_path
 
 
 def set_output_path_for_qformat_qparam(
-    model_script_path, recalibrate, output_path="./test/output"
+    model_script_path, recalibrate, output_path
 ):
     if not recalibrate:
         golden_output_path = "./test/output_rngd_gelu_hf_data/hf"
-        mlperf_output_path = "./test/output_rngd_gelu_hf_data/mlperf"
+        comparison_output_path = "./test/output_rngd_gelu_hf_data/mlperf"
         if not is_qparam_same(
-            model_script_path, golden_output_path, mlperf_output_path
+            model_script_path, golden_output_path, comparison_output_path
         ):
             raise ValueError(
                 "Golden qparam files are corrupted. Retry with --recalibrate option."
@@ -161,10 +165,10 @@ def set_output_path_for_qformat_qparam(
         if not os.path.exists(output_path):
             os.makedirs(output_path)
 
-        golden_output_path = os.path.join(output_path, "hf")
-        mlperf_output_path = os.path.join(output_path, "mlperf")
+        golden_output_path = os.path.join(output_path, "golden")
+        comparison_output_path = os.path.join(output_path, "comparison")
 
-    return golden_output_path, mlperf_output_path
+    return golden_output_path, comparison_output_path
 
 
 def dump_using_mlperf_loadgens(args, sut, dumpfile_path):
@@ -226,26 +230,24 @@ def dump_using_mlperf_loadgens(args, sut, dumpfile_path):
 
 
 def is_qparam_same(
-    model_script_path, hf_output_path, mlperf_output_path, print_log=False
+    model_script_path, golden_output_path, comparison_output_path, print_log=False
 ):
     import numpy as np
 
-    hf_qparam_path = (
-        f"{hf_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
-    )
-    mlperf_qparam_path = f"{mlperf_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
+    golden_qparam_path = f"{golden_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
+    comparison_qparam_path = f"{comparison_output_path}/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
 
-    hf_qparam = np.load(hf_qparam_path, allow_pickle=True).item()
-    mlperf_qparam = np.load(mlperf_qparam_path, allow_pickle=True).item()
+    golden_qparam = np.load(golden_qparam_path, allow_pickle=True).item()
+    comparison_qparam = np.load(comparison_qparam_path, allow_pickle=True).item()
 
     failure_count = 0
-    for module_name, module_qparam in mlperf_qparam.items():
+    for module_name, module_qparam in comparison_qparam.items():
         try:
-            hf_data = hf_qparam[module_name]
+            golden_data = golden_qparam[module_name]
         except:
             continue
 
-        for qparam_name, qparam in hf_data.items():
+        for qparam_name, qparam in golden_data.items():
             if qparam is None:
                 continue
 
@@ -391,10 +393,12 @@ def test_model_equivalence():
 
     from pytorch_SUT import get_pytorch_sut
 
-    golden_output_path, mlperf_output_path = set_output_path_for_qformat_qparam(
-        args.model_script_path, args.recalibrate
+    golden_output_path, comparison_output_path = set_output_path_for_qformat_qparam(
+        args.model_script_path, args.recalibrate, output_path="./test/mlperf_submission"
     )
-    golden_dump_file_path, mlperf_dump_file_path = set_dump_file_path()
+    golden_dump_file_path, comparison_dump_file_path = set_dump_file_path(
+        dump_file_folder="./test/mlperf_submission/dumped"
+    )
 
     # ---------------------------------------------------------
     # Dump golden model
@@ -426,10 +430,10 @@ def test_model_equivalence():
         args.n_calib,
         args.recalibrate,
         use_packed_dataloader=False,
-        output_path=mlperf_output_path,
+        output_path=comparison_output_path,
     )
-    mlperf_model_test_sample = dump_using_mlperf_loadgens(
-        args, sut, dumpfile_path=mlperf_dump_file_path
+    comparison_model_test_sample = dump_using_mlperf_loadgens(
+        args, sut, dumpfile_path=comparison_dump_file_path
     )
 
     # ---------------------------------------------------------
@@ -438,15 +442,15 @@ def test_model_equivalence():
     # ---------------------------------------------------------
     if args.recalibrate:
         if is_qparam_same(
-            args.model_script_path, golden_output_path, mlperf_output_path
+            args.model_script_path, golden_output_path, comparison_output_path
         ):
             print("Qparam comparision test passed.")
 
     if is_logit_same(
         golden_dump_file_path,
-        mlperf_dump_file_path,
+        comparison_dump_file_path,
         golden_model_test_sample,
-        mlperf_model_test_sample,
+        comparison_model_test_sample,
         mcm_name_to_check="qa_outputs",
     ):
         print("Logits comparison test passed.")
