@@ -172,8 +172,7 @@ def compare_model_outputs():
         output_batch_submission = submission_generator.generate(**input_batch, max_length = seq_len+3, min_new_tokens = 10)
         #output_batch_submission = submission_generator.generate(**input_batch, max_length=2048, **gen_kwargs)
 
-    import pdb; pdb.set_trace()
-    
+
     is_logit_same(golden_model_file_path='./ci_test_file/golden_prefill_logits.pkl',
                   comparison_model_file_path = './ci_test_file/submission_prefill_logits.pkl', 
                   mcm_name_to_check='lm_logits')
