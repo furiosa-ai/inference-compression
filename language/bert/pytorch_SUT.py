@@ -142,9 +142,7 @@ class BERT_PyTorch_SUT:
                 padded_sequences["attention_mask"] = attention_mask
                 padded_sequences["token_type_ids"] = token_type_ids
 
-                from furiosa_llm_models.generators.bert_generator import (
-                    BertUnsplitPackedGenerator,
-                )
+
 
                 if self.debug_mode:
                     # 첫번째 샘플에 대해서 비교 진행
@@ -156,10 +154,7 @@ class BERT_PyTorch_SUT:
                         }
                     )
 
-                generator = BertUnsplitPackedGenerator(
-                    model=self.model, compact_mask=False
-                )
-                model_output = generator.generate(
+                model_output = self.model.generate(
                     **padded_sequences,
                     bucket_size=384,
                     pad_token_id=0,
