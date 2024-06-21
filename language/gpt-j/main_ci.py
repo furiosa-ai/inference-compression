@@ -46,9 +46,6 @@ def is_logit_same(
                     continue
 
             except EOFError:
-                print(
-                    f"It's end of file. Please check file path {golden_model_file_path} again."
-                )
                 break
 
 
@@ -78,26 +75,15 @@ def is_logit_same(
 
 #load model_script
 def compare_model_outputs():
-    #For real test
-    # model_path = './model'
-    # model_config = AutoConfig.from_pretrained('./hf_rope_vs_mlperf_forward_test/config.json')
-    # model_config.n_layer = 2
-    # model = GPTJForCausalLM.from_pretrained(model_path, config=model_config)
-    
-
     torch_device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(torch_device_type)
 
-    
-    #for the sake of convenience 
     from furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu import GPTJForCausalLM
-    config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
-    golden_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
+    model_path = './model'
+    model_config = AutoConfig.from_pretrained('./ci_test_file/config.json')
+    golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
-    
-
-    
-    calib_dataset_path = './ci_test_file/calibration_dataset_100.json'
+    calib_dataset_path = './ci_test_file/calibration_dataset_20.json'
     evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
     model_script_path = './ci_test_file/model_script.yaml'
     qformat_path = './ci_test_file/golden_qformat.yaml'
@@ -115,7 +101,7 @@ def compare_model_outputs():
     
            
     from furiosa_llm_models.gptj.symbolic.mlperf_submission import GPTJForCausalLM
-    submission_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
+    submission_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
     
     submission_generator = quantization.get_quant_model(model = submission_model, 
@@ -164,8 +150,6 @@ def compare_model_outputs():
     
     
 
-    
-    
     validation_dataset = Dataset(dataset_path = evaluation_dataset_path)
     
     #code based on issue queries
@@ -176,7 +160,7 @@ def compare_model_outputs():
         input_batch['attention_mask'] = validation_dataset.source_encoded_attn_masks[idx].to(device)
         #default dtype are set as fp32 during inference
         #with torch.inference_mode(), torch.autocast(device_type=torch_device_type, enabled=False, dtype=None):
-        output_batch_golden = golden_model_generator.generate(**input_batch, **gen_kwargs, pad_token_id = config.eos_token_id)
+        output_batch_golden = golden_model_generator.generate(**input_batch, **gen_kwargs, pad_token_id = model_config.eos_token_id)
         output_batch_submission = submission_generator.generate(**input_batch, max_length=2048, **gen_kwargs)
     
     
