@@ -39,10 +39,16 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
         from .calib_dataloader import load_bert_calibration_data
         calib_eval_features = load_bert_calibration_data(sut.qsl, n_calib)
         
-        if model_source == 'mlperf_submission':
+        if model_source == 'mlperf_submission' or model_source == 'compact_causal_mask':
             from .calib_dataloader import make_packed_calib_data_loader
             if use_packed_dataloader:
-                calib_dataloader = make_packed_calib_data_loader(calib_eval_features, model_script['calib_batch_size'], n_calib, pad_token_id=0, bucket_size=384, compact_mask=False) 
+                calib_dataloader = make_packed_calib_data_loader(
+                    calib_eval_features, model_script['calib_batch_size'], 
+                    n_calib, 
+                    pad_token_id=0, 
+                    bucket_size=384, 
+                    compact_mask=True if  model_source == 'compact_causal_mask' else False
+                    ) 
             else:
                 calib_dataloader = make_dataloader(calib_eval_features, model_script['calib_batch_size'], n_calib, include_position_ids=True)
         else:            
@@ -132,9 +138,12 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
         disable_inout=(True,True),
     )
     
-    if model_source == 'mlperf_submission':
+    if model_source == 'mlperf_submission' or model_source == 'compact_causal_mask':
         from furiosa_llm_models.generators.bert_generator import BertUnsplitPackedGenerator
-        generator = BertUnsplitPackedGenerator(model=quant_model, compact_mask=False)
+        generator = BertUnsplitPackedGenerator(
+            model=quant_model, 
+            compact_mask=True if model_source == 'compact_causal_mask' else False
+            )
     else:
         generator = None
     

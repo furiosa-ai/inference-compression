@@ -79,6 +79,10 @@ class BERT_PyTorch_SUT:
             from furiosa_llm_models.bert.symbolic.mlperf_submission import (
                 BertForQuestionAnswering,
             )
+        elif self.model_source == 'compact_causal_mask':
+            from furiosa_llm_models.bert.symbolic.experimental.huggingface_unsplit_packed import (
+                BertForQuestionAnswering,
+            )
 
         self.model = BertForQuestionAnswering(config)
         self.model.to(self.dev)
@@ -136,7 +140,7 @@ class BERT_PyTorch_SUT:
                     attention_mask=attention_mask,
                     token_type_ids=token_type_ids,
                 )
-            elif self.model_source == "mlperf_submission":
+            elif self.model_source == "mlperf_submission" or self.model_source == "compact_causal_mask":
                 padded_sequences = {}
                 padded_sequences["input_ids"] = input_ids
                 padded_sequences["attention_mask"] = attention_mask
@@ -164,7 +168,7 @@ class BERT_PyTorch_SUT:
                 if self.model_source == "huggingface_rngd_gelu":
                     start_scores = model_output["start_logits"]
                     end_scores = model_output["end_logits"]
-                elif self.model_source == "mlperf_submission":
+                elif self.model_source == "mlperf_submission" or self.model_source == "compact_causal_mask":
                     start_scores = model_output[0][:, 0]  # batch_size=1 가정.
                     end_scores = model_output[0][:, 1]
                 else:
