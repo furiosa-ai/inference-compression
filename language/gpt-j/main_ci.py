@@ -83,6 +83,11 @@ def compare_model_outputs():
     model_config = AutoConfig.from_pretrained('./ci_test_file/config.json')
     golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
+    #To test without downloading the MLPerf model, load the model as below.
+    #config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
+    #golden_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
+    
+    
     calib_dataset_path = './ci_test_file/calibration_dataset_20.json'
     evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
     model_script_path = './ci_test_file/model_script.yaml'
