@@ -30,7 +30,7 @@ from utils import set_optimization, random_seed
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-            "--backend", choices=["tf", "pytorch", "onnxruntime", "tf_estimator", "ray"], default="tf", help="Backend")
+            "--backend", choices=["tf", "pytorch", "onnxruntime", "tf_estimator", "ray"], default="pytorch", help="Backend")
     parser.add_argument("--scenario", choices=["SingleStream", "Offline",
                                                "Server", "MultiStream"], default="Offline", help="Scenario")
     parser.add_argument("--accuracy", action="store_true",
@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument("--n_calib", type=int,  default=-1)
     parser.add_argument('--torch_optim',default='none',type=str,choices=['default', 'none'],help='Torch optimization.',)
     parser.add_argument('--n_layers',default='-1',type=int, help='set the number of layers.',)
-    parser.add_argument('--model_source',default='unsplit_packed',type=str,choices=['huggingface_rngd_gelu', 'mlperf_submission'], help='choose model source',)
+    parser.add_argument('--model_source',default='huggingface_rngd_gelu',type=str,choices=['huggingface_rngd_gelu', 'mlperf_submission', 'compact_causal_mask'], help='choose model source',)
 
     args = parser.parse_args()
     return args
@@ -107,7 +107,14 @@ def main():
             raise ValueError("Unknown backend: {:}".format(args.backend))
     
     if args.use_mcp:
-        sut.model = get_quant_model(sut, args.model_source, args.model_script_path, args.n_calib, args.recalibrate)
+        sut.model = get_quant_model(
+            sut, 
+            args.model_source, 
+            args.model_script_path, 
+            args.n_calib, 
+            args.recalibrate,
+            use_packed_dataloader=False if args.model_source=='huggingface_rngd_gelu' else True,
+            )
         
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
