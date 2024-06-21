@@ -198,7 +198,7 @@ def dump_using_mlperf_loadgens(args, sut, dumpfile_path):
     if args.model_source == "mlperf_submission":
         quant_model = sut.model.model
     else:
-        quant_model = ut.model
+        quant_model = sut.model
 
     model_compressor.set_model_to_dump_golden_model(
         dumpfile_path,
