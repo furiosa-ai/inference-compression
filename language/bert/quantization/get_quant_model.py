@@ -132,7 +132,14 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
         disable_inout=(True,True),
     )
     
+    if model_source == 'mlperf_submission':
+        from furiosa_llm_models.generators.bert_generator import BertUnsplitPackedGenerator
+        generator = BertUnsplitPackedGenerator(model=quant_model, compact_mask=False)
+    else:
+        generator = None
     
+    if generator is None:
+        return quant_model
     
-    return quant_model
+    return generator
     

@@ -195,9 +195,14 @@ def dump_using_mlperf_loadgens(args, sut, dumpfile_path):
     # Enable debug mode
     # ---------------------------------------------------------
     sut.debug_mode = True
+    if args.model_source == "mlperf_submission":
+        quant_model = sut.model.model
+    else:
+        quant_model = sut.model
+
     model_compressor.set_model_to_dump_golden_model(
         dumpfile_path,
-        sut.model,
+        quant_model,
         dumping_range="qlv4_linear",
         dumping_mode="only-in-out",
         qlv4_skip_output_rounding=False,
