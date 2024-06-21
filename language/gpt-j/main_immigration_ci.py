@@ -81,7 +81,6 @@ def compare_model_outputs():
     from furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu import GPTJForCausalLM
     model_path = './model'
     model_config = AutoConfig.from_pretrained('./ci_test_file/config.json')
-    model_config.n_layer = 4
     golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
     #To test without downloading the MLPerf model, load the model as below.
