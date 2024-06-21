@@ -118,7 +118,7 @@ def get_args():
     )
     parser.add_argument(
         "--model_source",
-        default="unsplit_packed",
+        default="mlperf_submission",
         type=str,
         choices=[
             "huggingface_rngd_gelu",
