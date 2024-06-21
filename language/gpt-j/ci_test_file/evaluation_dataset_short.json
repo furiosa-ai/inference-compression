@@ -1,0 +1,7 @@
+[ 
+    { 
+        "input": "(CNN)On the 6th of April 1996, San Jose Clash and DC United strode out in front of 31,683 expectant fans at the Spartan Stadium in San Jose.", 
+        "instruction": "Summarize the following news article:", 
+        "output": "The 20th MLS season begins this weekend .\nLeague has changed dramatically since its inception in 1996 .\nSome question whether rules regarding salary caps and transfers need to change ." 
+        } 
+]
