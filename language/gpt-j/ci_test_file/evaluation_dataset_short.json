@@ -1,6 +1,6 @@
 [ 
     { 
-        "input": "(CNN)On the 6th of April 1996, San Jose Clash and DC United strode out in front of 31,683 expectant fans at the Spartan Stadium in San Jose, California. The historic occasion was the first ever Major League Soccer match -- a brave new dawn for the world's favorite sport in a land its charms had yet to conquer. Summarizing the action for ESPN, commentator Ty Keough eagerly described the momentous \"birth of a new era for American soccer.\" Looking back at footage from that balmy evening now it's hard not to feel a certain nostalgia. Baggy shirts, questionable hairstyles and strange rule adaptations to make games more exciting were all part of the formative MLS experience.", 
+        "input": "(CNN)On the 6th of April 1996, San Jose Clash and DC United strode out in front of 31,683 expectant fans at the Spartan Stadium in San Jose.", 
         "instruction": "Summarize the following news article:", 
         "output": "The 20th MLS season begins this weekend .\nLeague has changed dramatically since its inception in 1996 .\nSome question whether rules regarding salary caps and transfers need to change ." 
         } 
