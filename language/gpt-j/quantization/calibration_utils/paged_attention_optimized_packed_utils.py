@@ -106,7 +106,7 @@ def make_calib_dataloader_for_paged_attention_packed(
         attention_mask = torch.zeros((batch_size, bucket_size), dtype=torch.int)
         attention_mask[:, :prompt_len] = starting_attention_mask
 
-        input_ids = torch.zeros((batch_size, bucket_size), dtype=torch.int)
+        input_ids = torch.full((batch_size, bucket_size), fill_value=pad_token_id, dtype=torch.int)
         input_ids[:, :prompt_len] = starting_input_ids
 
         position_ids = torch.zeros((batch_size, bucket_size), dtype=torch.long)
