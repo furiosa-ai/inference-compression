@@ -90,7 +90,7 @@ def compare_model_outputs():
     
     
     calib_dataset_path = './ci_test_file/calibration_dataset_20.json'
-    evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
+    evaluation_dataset_path = './ci_test_file/evaluation_dataset_short.json'
     model_script_path = './ci_test_file/model_script.yaml'
     qformat_path = './ci_test_file/golden_qformat.yaml'
     qparam_path = './ci_test_file/golden_qparam.npy'
@@ -163,10 +163,8 @@ def compare_model_outputs():
     for idx in range(len(validation_dataset.sources)):
         
         input_batch = dict()
-        input_batch['input_ids'] = validation_dataset.source_encoded_input_ids[idx][:,:50].to(device)
-        input_batch['attention_mask'] = validation_dataset.source_encoded_attn_masks[idx][:,:50].to(device)
-        # input_batch['input_ids'] = validation_dataset.source_encoded_input_ids[idx].to(device)
-        # input_batch['attention_mask'] = validation_dataset.source_encoded_attn_masks[idx].to(device)
+        input_batch['input_ids'] = validation_dataset.source_encoded_input_ids[idx].to(device)
+        input_batch['attention_mask'] = validation_dataset.source_encoded_attn_masks[idx].to(device)
         seq_len = input_batch['input_ids'].shape[1]
         output_batch_golden = golden_model_generator.generate(**input_batch, **gen_kwargs, pad_token_id = model_config.eos_token_id)
         output_batch_submission = submission_generator.generate(**input_batch, max_length = seq_len+3, min_new_tokens = 10)
