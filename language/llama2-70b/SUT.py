@@ -10,7 +10,7 @@ import accelerate
 import transformers
 
 
-from furiosa_llm_models.generators.symbolic.paged_attention_optimized_generator import (
+from furiosa_llm_models.generators.symbolic.llama_multi_gpu_paged_attention_optimized_generator import (
     PagedAttentionGenerator as TextGeneratorGreedySearch,
 )
 from transformers.generation.streamers import BaseStreamer
