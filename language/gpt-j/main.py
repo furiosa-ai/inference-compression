@@ -48,6 +48,8 @@ def get_args():
     parser.add_argument("--model_source", type = str, default = "furiosa_llm_original", help="the type of GPTJForCausalLM to use")
     parser.add_argument('--n_layers',default='-1',type=int, help='set the number of layers.',)
     parser.add_argument('--calib_without_padding', action="store_true", default=False, help="use mcp to quantize the model")
+    parser.add_argument('--qformat_path', type = str, default=None, help="")
+    parser.add_argument('--qparam_path', type = str, default=None, help="")
     
     args = parser.parse_args()
     return args
@@ -79,7 +81,7 @@ def main():
     )
 
     if args.use_mcp:
-        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.calib_without_padding, args.recalibrate)
+        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.calib_without_padding, args.recalibrate, args.qformat_path, args.qparam_path)
 
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
