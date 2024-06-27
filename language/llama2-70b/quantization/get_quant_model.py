@@ -89,6 +89,7 @@ def get_quant_model(model, args, immigrate_qparams=False):
         kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16',
         disable_inout=(True, True),
         delete_org_weight=True,
+        weighted_op_emul_dtype='fp32',
         immigrate_qparams=immigrate_qparams,
     )
 
@@ -104,6 +105,7 @@ def get_quant_model(model, args, immigrate_qparams=False):
         decode_phase=True,
         quantized_prefill_model=prefill_quantized_model,
         delete_org_weight=True,
+        weighted_op_emul_dtype='fp32',
         immigrate_qparams=immigrate_qparams,
     )
 
