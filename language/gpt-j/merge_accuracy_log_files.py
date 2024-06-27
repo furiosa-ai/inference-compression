@@ -74,7 +74,6 @@ def main():
         
 
     n_splited_data=len(results[0])
-    import pdb;pdb.set_trace()
     # Deduplicate the results loaded from the json
     dedup_results = []
     seen = set()
