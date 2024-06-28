@@ -17,16 +17,9 @@ gen_kwargs = {
     "early_stopping": True,
     "max_new_tokens": 128,
     "min_new_tokens": 30,
-    "num_beams": 2, 
+    "num_beams": 4, 
 }
 
-
-# gen_kwargs = {
-#     "early_stopping": True,
-#     "max_new_tokens": 4,
-#     "min_new_tokens": 2,
-#     "num_beams": 2, 
-# }
 
 
 def load_all_tensors_from_pickle(file_path, mcm_module_name):
@@ -82,15 +75,7 @@ def compare_model_outputs():
     from furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu import GPTJForCausalLM
     model_path = './model'
     model_config = AutoConfig.from_pretrained('./ci_test_file/config.json')
-    model_config.n_layer = 2 
     golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
-    
-    
-    #To test without downloading the MLPerf model, load the model as below.
-    # model_path = "EleutherAI/gpt-j-6B"
-    # model_config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
-    # model_config.n_layer = 2 
-    # golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
     
     calib_dataset_path = './ci_test_file/calibration_dataset.json'
@@ -120,7 +105,8 @@ def compare_model_outputs():
                                                      recalibrate = False, 
                                                      qformat_path = qformat_path, 
                                                      qparam_path = qparam_path,
-                                                     immigrate_qparams = True)
+                                                     immigrate_qparams = True,
+                                                     num_beams = gen_kwargs["num_beams"])
     
     
     #Turn on mcp dump
