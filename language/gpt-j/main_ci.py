@@ -58,10 +58,10 @@ def check_logits(
             is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :][0].unsqueeze(0), comparison_tensor_list[idx][:, -valid_seq_len:, :])
         else:
             is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :], comparison_tensor_list[idx][:, -valid_seq_len:, :])
-        
+
         if not is_successful:
             raise ValueError("Logits comparison test failed.")
-
+        
     return True
     
 
@@ -77,7 +77,12 @@ def compare_model_outputs():
     model_config = AutoConfig.from_pretrained('./ci_test_file/config.json')
     golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
-    
+    #To test without downloading the MLPerf model, load the model as below.
+    # model_path = "EleutherAI/gpt-j-6B"
+    # model_config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
+    # golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
+
+
     calib_dataset_path = './ci_test_file/calibration_dataset.json'
     evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
     model_script_path = './ci_test_file/model_script.yaml'
@@ -106,7 +111,7 @@ def compare_model_outputs():
                                                      qformat_path = qformat_path, 
                                                      qparam_path = qparam_path,
                                                      immigrate_qparams = True,
-                                                     num_beams = gen_kwargs["num_beams"])
+                                                     gen_kwargs = gen_kwargs)
     
     
     #Turn on mcp dump
