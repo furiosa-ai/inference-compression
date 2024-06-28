@@ -84,7 +84,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False, num_beams = 4):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False, gen_kwargs = gen_kwargs):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
     
@@ -123,8 +123,13 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
         #The following usage of mcp helper tracer will be removed soon once paged_attention_rope_rngd_gelu is added   
             model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False, disable_check=True)    
+        elif type(model) ==  furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
+            traced_models = model.trace_all(**gen_kwargs)
         else:
-            model_for_calib = model.trace_prefill()
+            traced_models = model.trace_all()
+
+
+            model_for_calib = model.trace_prefill(**gen_kwargs)
 
         # Extract necessary parameters to initialize QuantPreTrainedModel
         model_for_calib = model_compressor.create_quantsim_model(
@@ -215,7 +220,10 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         return generator(decode_model, model_type, total_block_space, bucket_size) 
     
     else: 
-        traced_models = model.trace_all()
+        if type(model) ==  furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
+            traced_models = model.trace_all(**gen_kwargs)
+        else:
+            traced_models = model.trace_all()
         
         input_names = {
         "prefill_input_names": traced_models["prefill"].input_names,
@@ -285,7 +293,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
-                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8, return_tensors = True, num_beams = num_beams)
+                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8, return_tensors = True, num_beams = gen_kwargs["num_beams"])
             else:
                 
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
