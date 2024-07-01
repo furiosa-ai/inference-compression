@@ -7,9 +7,8 @@ import furiosa_llm_models
 from typing import Optional 
 from dataset import Dataset
 import copy
-
-
-
+from transformers import AutoTokenizer
+from utils import create_sample_calib_dataloader_from_generator
 
 gen_kwargs = {
     "early_stopping": True,
@@ -95,16 +94,28 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
             from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
-            calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
-        elif type(model) in [furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM,]:
-            from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
-            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
-            calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
-        # elif type(model) == furiosa_llm_models.gptj.paged_attentin_rope
-        
+            calib_dataloader = make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
         else:
-            from .calibration_utils.make_calib_dataloader import make_calib_dataloader
-            calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], calib_without_padding)
+            if type(model) == furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
+                from furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized import PagedAttentionGeneratorBeamSearch
+                generator_class = PagedAttentionGeneratorBeamSearch
+            elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
+                from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
+                generator_class = PagedAttentionGenerator
+            elif type(model) == furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu.GPTJForCausalLM:
+                generator_class = None
+
+            model_name_for_tokenizer = "EleutherAI/gpt-j-6B"
+            calib_dataloader = (
+                create_sample_calib_dataloader_from_generator(
+                    calib_dataset_path,
+                    model,
+                    model_name_for_tokenizer,
+                    generator_class,
+                    AutoTokenizer,
+                    device=model.device,
+                )
+            )
             
   
     run_autoscale = model_script.get("autoscale", 'disabled') != 'disabled'  
