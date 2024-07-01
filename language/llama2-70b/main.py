@@ -27,7 +27,6 @@ def get_args():
     parser.add_argument("--output-log-dir", type=str, default="output-logs", help="Where logs are saved")
     parser.add_argument("--enable-log-trace", action="store_true", help="Enable log tracing. This file can become quite large")
     parser.add_argument("--num-workers", type=int, default=1, help="Number of workers to process queries")
-    
     parser.add_argument("--model_source", 
                         choices=[
                             "furiosa_llm_rope", 
@@ -43,7 +42,8 @@ def get_args():
     parser.add_argument('--torch_numeric_optim', action="store_true", help="use Pytorch numerical optimizaiton for CUDA/cudnn")
     parser.add_argument("--n_layers", type=int, default=-1, help="Set the number of layers of the model.")
     parser.add_argument("--weighted_op_emul_dtype", type=str, default="fp32", help="set emulation type of weighted operators")
-
+    parser.add_argument("--num_splits", type=int, default=1, help="")
+    parser.add_argument("--split_idx", type=int, default=0, help="")
 
     args = parser.parse_args()
     return args
@@ -95,6 +95,8 @@ def main():
         total_sample_count=args.total_sample_count,
         device=args.device,
         n_layers=args.n_layers,
+        num_splits=args.num_splits,
+        split_idx=args.split_idx,
     )
     
     if args.quantize:

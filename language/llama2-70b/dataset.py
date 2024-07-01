@@ -19,13 +19,14 @@ log = logging.getLogger("Llama-70B-Dataset")
 import random
 
 class Dataset():
-    def __init__(self, model_name=None, total_sample_count=24576, perf_count_override=None, dataset_path=None, device="cpu"):
+    def __init__(self, model_name=None, total_sample_count=24576, perf_count_override=None, dataset_path=None, device="cpu", num_splits=1, split_idx=0):
         self.model_name = model_name or "meta-llama/Llama-2-70b-chat-hf"
         self.dataset_path = dataset_path
         self.max_length = 1024
         self.device = device
-
-        #self.total_sample_count = total_sample_count
+        self.num_splits = num_splits
+        self.split_idx = split_idx
+        self.total_sample_count = total_sample_count
 
         self.load_tokenizer()
         self.load_processed_dataset()
@@ -53,10 +54,18 @@ class Dataset():
 
         input_tokens = processed_data['tok_input']
 
+        if self.num_splits > 1:
+            total_sample_length= min(len(input_tokens), self.total_sample_count)
+            n_splited_data = int(total_sample_length/self.num_splits)
+            start_idx = self.split_idx*n_splited_data
+            end_idx= (self.split_idx+1)*n_splited_data if self.split_idx!=self.num_splits-1 else total_sample_length
+            input_tokens = input_tokens[start_idx:end_idx]
+        
         self.input_ids = []
         self.input_lens = []
         self.attention_masks = []
 
+        
         for ids in input_tokens:
             input_ids = torch.tensor(ids, dtype=torch.int32).view(1,-1).to(self.device)
             attn_mask = torch.ones_like(input_ids)
