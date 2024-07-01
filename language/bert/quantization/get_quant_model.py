@@ -8,6 +8,8 @@ import torch
 #calib_dataset_path
 from transformers.generation.utils import *
 
+BUCKET_SIZE = 384
+PAD_TOKEN_ID = 0
 
 def load_model_script(model_script_path):
     with open(model_script_path, 'r') as f:
@@ -45,8 +47,8 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
                 calib_dataloader = make_packed_calib_data_loader(
                     calib_eval_features, model_script['calib_batch_size'], 
                     n_calib, 
-                    pad_token_id=0, 
-                    bucket_size=384, 
+                    pad_token_id=PAD_TOKEN_ID, 
+                    bucket_size=BUCKET_SIZE, 
                     compact_mask=True if  model_source == 'compact_causal_mask' else False
                     ) 
             else:
@@ -139,16 +141,18 @@ def get_quant_model(sut, model_source, model_script_path, n_calib, recalibrate, 
     )
     
     if model_source == 'mlperf_submission' or model_source == 'compact_causal_mask':
-        from furiosa_llm_models.generators.bert_generator import BertUnsplitPackedGenerator
-        generator = BertUnsplitPackedGenerator(
+        from furiosa_llm_models.encoders.bert_encoder import BertUnsplitPackedEncoder
+        encoder = BertUnsplitPackedEncoder(
             model=quant_model, 
-            compact_mask=True if model_source == 'compact_causal_mask' else False
+            compact_mask=True if model_source == 'compact_causal_mask' else False,
+            bucket_size=BUCKET_SIZE,
+            pad_token_id=PAD_TOKEN_ID,
             )
     else:
-        generator = None
+        encoder = None
     
-    if generator is None:
+    if encoder is None:
         return quant_model
     
-    return generator
+    return encoder
     
