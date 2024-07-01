@@ -158,10 +158,8 @@ class BERT_PyTorch_SUT:
                         }
                     )
 
-                model_output = self.model.generate(
+                model_output = self.model.encode(
                     **padded_sequences,
-                    bucket_size=384,
-                    pad_token_id=0,
                 )
 
             if self.version >= "4.0.0":
