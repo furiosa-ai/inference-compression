@@ -98,7 +98,10 @@ class SUT():
                  dataset_path=None,
                  use_cached_outputs=False,  # Set this to True *only for test accuracy runs* in case your prior session was killed partway through
                  n_layers=-1,
-                 workers=1):
+                 workers=1,
+                 num_splits=1,
+                 split_idx=0,
+                 ):
 
         self.model_path = model_path or "meta-llama/Llama-2-70b-chat-hf"
         self.model_source = model_source
@@ -129,7 +132,9 @@ class SUT():
         self.data_object = Dataset(self.model_path,
                                    dataset_path=self.dataset_path,
                                    total_sample_count=total_sample_count,
-                                   device=self.device)
+                                   device=self.device,
+                                   num_splits=num_splits,
+                                   split_idx=split_idx)
         self.qsl = lg.ConstructQSL(self.data_object.total_sample_count, self.data_object.perf_count,
                                    self.data_object.LoadSamplesToRam, self.data_object.UnloadSamplesFromRam)
 
