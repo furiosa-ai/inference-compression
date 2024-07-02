@@ -281,8 +281,9 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
-                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
-            else:                
+                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8, return_tensors = True)
+            else:
+                
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
