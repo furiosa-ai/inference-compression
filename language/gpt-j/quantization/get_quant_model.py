@@ -139,7 +139,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=calib_dataloader,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
         )
 
@@ -174,7 +174,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                 act_dtype=model_script["act_dtype"],
                 act_nbits=model_script["act_nbits"],
                 kv_dtype=model_script["kv_dtype"] if  "kv_dtype" in model_script else 'bf16',
-                disable_inout=(True, True),
+                disable_inout=(True, False),
             )
 
 
@@ -200,7 +200,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=None,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             delete_org_weight=True,
         )
@@ -238,7 +238,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=None,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             # decode_phase = True,
             delete_org_weight=True,
@@ -261,7 +261,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=None,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
             delete_org_weight=True,
