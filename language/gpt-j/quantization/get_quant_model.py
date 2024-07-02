@@ -278,8 +278,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
 
         if model_type in FURIOSA_GENERATOR_DICT.keys():
             generator = FURIOSA_GENERATOR_DICT[model_type]
-            if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
-                return generator(quant_causallm, bucket_size = 2048)
+            if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
                 return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
