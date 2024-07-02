@@ -21,7 +21,7 @@ gen_kwargs = {
 
 
 FURIOSA_GENERATOR_DICT = {
-    furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch,
+    furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM : furiosa_llm_models.generators.v3.paged_attention.generator.MLPerfSubmissionGenerator,
     # furiosa_llm_models.gptj.symbolic.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator,
     furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.symbolic.quant_paged_attention_generator.QuantPagedAttentionGenerator,
     # furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch,
@@ -41,7 +41,7 @@ def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 
     else:
         raise NotImplementedError
     
-    num_blocks = batch_size * 4  * 2 * (bucket_size) * block_size + 1
+    num_blocks = batch_size * 2 * (bucket_size) * block_size + 1
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
@@ -280,12 +280,12 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             generator = FURIOSA_GENERATOR_DICT[model_type]
             # if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
             #     return generator(quant_causallm, bucket_size = 2048)
-            if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
+            if generator == furiosa_llm_models.generators.v3.paged_attention.generator.MLPerfSubmissionGenerator:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
-                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
-            else:
-                
+                #return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
+                return generator(quant_models)
+            else:                
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
