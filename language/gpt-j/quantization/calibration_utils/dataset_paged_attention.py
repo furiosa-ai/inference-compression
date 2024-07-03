@@ -35,7 +35,7 @@ class Dataset_for_paged_attention(Dataset):
                 self.total_block_space[type_idx][block_idx] = self.total_block_space[type_idx][block_idx].to(kv_cache_device)
                             
                 
-    def empty_total_block_space(self, device, device_map = None):
+    def init_total_block_space(self, device, device_map = None):
         tensor_shape = self.total_block_space[0][0].shape
         dtype = self.total_block_space[0][0].dtype
         for type_idx in range(len(self.total_block_space)):
