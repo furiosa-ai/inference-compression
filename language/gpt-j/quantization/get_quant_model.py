@@ -8,7 +8,7 @@ from typing import Optional
 from dataset import Dataset
 import copy
 from transformers import AutoTokenizer
-from utils import create_sample_calib_dataloader_from_generator
+from model_compressor.utils import calib_generator
 
 gen_kwargs = {
     "early_stopping": True,
@@ -103,17 +103,17 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                 from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
                 generator_class = PagedAttentionGenerator
             elif type(model) == furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu.GPTJForCausalLM:
-                generator_class = None
+                generator_class = "model_compressor.helper.QuantCausalLM"
 
             model_name_for_tokenizer = "EleutherAI/gpt-j-6B"
-            calib_dataloader = (
-                create_sample_calib_dataloader_from_generator(
+            calib_dataloader, _ = (
+                calib_generator(
                     calib_dataset_path,
                     model,
                     model_name_for_tokenizer,
                     generator_class,
                     AutoTokenizer,
-                    device=model.device,
+                    device='cpu',
                 )
             )
             
