@@ -41,7 +41,7 @@ def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 
     else:
         raise NotImplementedError
     
-    num_blocks = batch_size * 2 * (bucket_size) * block_size + 1
+    num_blocks = batch_size * 2 * (1920) * block_size + 1
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
