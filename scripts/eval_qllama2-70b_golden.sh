@@ -30,6 +30,9 @@ if [ $DEVICE = "cpu" ];
 fi
 
 # quantization args
+CALIBRATE=${CALIBRATE:=true}
+N_CALIB=${N_CALIB:=1000} # total_len = 1000
+CALIB_DATA_PATH=$data_dir/dataset/open-orca/calibration/open_orca_gpt4_tokenized_llama.calibration_1000.pkl
 QUANT_CONFIG_PATH=$quant_data_dir/quant_config.yaml
 QUANT_PARAM_PATH=$quant_data_dir/quant_param_golden.npy
 QUANT_FORMAT_PATH=$quant_data_dir/quant_format_golden.yaml
@@ -43,15 +46,26 @@ printf "\tDATA_TYPE: $DATA_TYPE\n"
 printf "\tNUM_DATA: $N_COUNT\n"
 printf "\tDEVICE: $DEVICE\n"
 
-if ((${N_COUNT} < 2000)); 
-    then USER_CONF=$git_dir/internal_test.conf;
-else
-    USER_CONF=user.conf;
-fi
-
 CHECKPOINT_PATH=$data_dir/models/llama2/Llama-2-70b-chat-hf
 DATASET_PATH=$data_dir/dataset/open-orca/validation/open_orca_gpt4_tokenized_llama.sampled_24576.pkl
 LOG_PATH=$log_dir/$model_name/$SCENARIO/$QUANT_DATATYPE/$(date +%Y%m%d_%H%M%S%Z)
+
+
+
+if [ "$CALIBRATE" = true ]; then
+    printf "\t\tNUM_CALIB_DATA: $N_CALIB\n"
+    python -m quantization.calibrate --backend=pytorch \
+                                     --model_path=$CHECKPOINT_PATH \
+                                     --quant_config_path=$QUANT_CONFIG_PATH \
+                                     --quant_param_path=$QUANT_PARAM_PATH \
+                                     --quant_format_path=$QUANT_FORMAT_PATH \
+                                     --calib_data_path=$CALIB_DATA_PATH \
+                                     --n_calib=$N_CALIB \
+                                     --model_source $MODEL_SOURCE \
+                                     --gpu=True\
+
+fi
+
 
 SECONDS=0
 python -u main.py --scenario Offline \
