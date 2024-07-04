@@ -9,6 +9,7 @@ from dataset import Dataset
 import copy
 from transformers import AutoTokenizer
 from model_compressor.utils import calib_generator
+from utils import postproc_for_PagedAttentionGeneratorBeamSearch
 
 gen_kwargs = {
     "early_stopping": True,
@@ -96,15 +97,21 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader = make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
         else:
+            postprocess_func=None
+
             if type(model) == furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
                 from furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized import PagedAttentionGeneratorBeamSearch
                 generator_class = PagedAttentionGeneratorBeamSearch
+                postprocess_func=postproc_for_PagedAttentionGeneratorBeamSearch
+                bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
+                total_block_space=
             elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
                 from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
                 generator_class = PagedAttentionGenerator
             elif type(model) == furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu.GPTJForCausalLM:
                 generator_class = "model_compressor.helper.QuantCausalLM"
 
+            GPTJ_MAX_LEN = 1919
             model_name_for_tokenizer = "EleutherAI/gpt-j-6B"
             calib_dataloader, _ = (
                 calib_generator(
@@ -113,7 +120,10 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                     model_name_for_tokenizer,
                     generator_class,
                     AutoTokenizer,
-                    device='cpu',
+                    device=model.device,
+                    postprocess_func=postprocess_func,
+                    model_max_length=GPTJ_MAX_LEN,
+                    total_block_space=total_block_space
                 )
             )
             
@@ -286,7 +296,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         }
 
 
-
         if model_type in FURIOSA_GENERATOR_DICT.keys():
             generator = FURIOSA_GENERATOR_DICT[model_type]
             # if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
@@ -300,5 +309,5 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
-        else: 
+        else:
             return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
