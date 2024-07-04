@@ -6,7 +6,7 @@ import yaml
 from torch.utils.data import DataLoader
 from torch.nn.functional import pad
 import model_compressor
-from .utils import get_kwargs, random_seed, set_optimization 
+from quantization.utils import get_kwargs, random_seed, set_optimization 
 
 # Assume BLOCK_SIZE, NUM_BLOCKS, BUCKET_SIZE are fixed for now.
 BLOCK_SIZE = 1
