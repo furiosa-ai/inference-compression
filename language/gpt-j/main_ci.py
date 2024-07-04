@@ -110,8 +110,7 @@ def compare_model_outputs():
                                                      recalibrate = False, 
                                                      qformat_path = qformat_path, 
                                                      qparam_path = qparam_path,
-                                                     immigrate_qparams = True,
-                                                     gen_kwargs = gen_kwargs)
+                                                     immigrate_qparams = True)
     
     
     #Turn on mcp dump

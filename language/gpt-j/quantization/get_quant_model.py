@@ -84,7 +84,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False, gen_kwargs = gen_kwargs):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False,):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
     
@@ -123,13 +123,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
         #The following usage of mcp helper tracer will be removed soon once paged_attention_rope_rngd_gelu is added   
             model_for_calib, _, _ = model_compressor.helper.gptj_custom_symbolic_trace(model, prefill_mode = False, disable_check=True)    
-        elif type(model) ==  furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
-            traced_models = model.trace_all(**gen_kwargs)
         else:
-            traced_models = model.trace_all()
-
-
-            model_for_calib = model.trace_prefill(**gen_kwargs)
+            model_for_calib = model.trace_prefill()
 
         # Extract necessary parameters to initialize QuantPreTrainedModel
         model_for_calib = model_compressor.create_quantsim_model(
@@ -220,10 +215,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         return generator(decode_model, model_type, total_block_space, bucket_size) 
     
     else: 
-        if type(model) ==  furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
-            traced_models = model.trace_all(**gen_kwargs)
-        else:
-            traced_models = model.trace_all()
+        traced_models = model.trace_all()
         
         input_names = {
         "prefill_input_names": traced_models["prefill"].input_names,
@@ -295,7 +287,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
                 return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8, return_tensors = True, num_beams = gen_kwargs["num_beams"])
             else:
-                
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
