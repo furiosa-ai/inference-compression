@@ -55,12 +55,13 @@ def get_args():
         "--quant_format_path", help="quantization specifications for calibrated layers"
     )
     
-    arser.add_argument(
+    parser.add_argument(
         "--qlv4_prefill_output_path", help="quantization parameters for calibraed layers"
     )
     parser.add_argument(
         "--qlv4_decode_output_path", help="quantization specifications for calibrated layers"
     )
+    parser.add_argument("--quant_config_path", help="a config for model quantization")
 
     parser.add_argument(
         "--n_layers", 
@@ -91,13 +92,16 @@ def save_qlv4_model_statdict():
         qconfig = yaml.safe_load(f)
     
     model = load_pytorch_model(args.model_source, args.model_path, args.n_layers)
-    qlv4_model = get_quant_model(model, args,)
+    qlv4_model = get_quant_model(model, args)
     if args.model_source == "mlperf_submission":
         torch.save(qlv4_model.prefill, args.qlv4_prefill_output_path)
         torch.save(qlv4_model.decode, args.qlv4_decode_output_path)
     else:
         torch.save(qlv4_model.prefill_model, args.qlv4_prefill_output_path)
         torch.save(qlv4_model.decode_model, args.qlv4_decode_output_path)
+    
+    print(f"qlevel4 prefill state dict saved in {args.qlv4_prefill_output_path}\n")
+    print(f"qlevel4 decode state dict saved in {args.qlv4_decode_output_path}\n")
     
 
 if __name__ == "__main__":
