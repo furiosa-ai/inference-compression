@@ -1,0 +1,1 @@
+python save_qlv4_statedict.py  --model_path ../../data/models/llama2/Llama-2-70b-chat-hf --quant_config_path ../../data/quantization/llama2/quant_config.yaml --quant_param_path ../../data/quantization/qparam.npy --quant_format_path --qlv4_prefill_output_path ../../data/quantization/prefill.bin --qlv4_decode_output_path ../../data/quantization/decode.bin
