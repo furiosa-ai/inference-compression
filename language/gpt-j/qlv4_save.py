@@ -12,6 +12,7 @@ model_source="mlperf_submission"
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", default="./model/", help="")
+    parser.add_argument("--model_config", default="./ci_test_file/config.json", help="")
     parser.add_argument("--model_script_path", default="./quantization/model_script/Qlevel4_RGDA0-W8A8KV8-PTQ-SMQ-rope_lm-headint8.yaml", help="")
     parser.add_argument("--model_source", type = str, default = "mlperf_submission", help="the type of GPTJForCausalLM to use")
     parser.add_argument('--qformat_path', type = str, default=f'./quantization/output/{version}/{model_source}/qformat.yaml', help="")
@@ -37,7 +38,7 @@ def save_qlv4_model():
         from furiosa_llm_models.gptj.symbolic.mlperf_submission import GPTJForCausalLM
     else:
         raise ValueError("other models are not considered.")
-    config = AutoConfig.from_pretrained(args.model_path)
+    config = AutoConfig.from_pretrained(args.model_config)
     model = GPTJForCausalLM.from_pretrained(args.model_path, config=config).to(device)
     
     model_generator = quantization.get_quant_model(model = model, 
