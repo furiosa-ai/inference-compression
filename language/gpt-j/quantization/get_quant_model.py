@@ -7,6 +7,9 @@ import furiosa_llm_models
 from typing import Optional 
 from dataset import Dataset
 import copy
+from transformers import AutoTokenizer
+from model_compressor.utils import calib_generator
+from utils import postproc_for_packed_algorithm
 
 from furiosa_llm_models.generators.mlperf_submission_generator_mcp import PagedAttentionGeneratorBeamSearch
 
@@ -97,18 +100,51 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         calib_dataloader = None
     else:
         if type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM:
+            '''
+               추후 deprecated 될 모델으로 auto-calib 적용 X
+            '''
             from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
-            calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
-        elif type(model) in [furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM,]:
-            from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
-            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32', num_beams = 1, max_prompt_len = 1920) #kv_dtype are set as float32 to enable dummy forwarding before calibration.
-            calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
-        # elif type(model) == furiosa_llm_models.gptj.paged_attentin_rope
-        
+            calib_dataloader = make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
         else:
-            from .calibration_utils.make_calib_dataloader import make_calib_dataloader
-            calib_dataloader = make_calib_dataloader(calib_dataset_path, model_script['calib_batch_size'], calib_without_padding)
+            GPTJ_MAX_LEN = 1919
+            postprocess_func=None
+            total_block_space=None
+            max_length=None
+
+            if type(model) == furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM: # MLPERF_SUBMISSION MODEL
+                # from furiosa_llm_models.generators.mlperf_submission_generator_mcp import PagedAttentionGeneratorBeamSearch
+                generator_class = PagedAttentionGeneratorBeamSearch
+                # prostprocessing : OOM issue 해결용 최적화
+                max_length=100
+                postprocess_func=postproc_for_packed_algorithm 
+                bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32', num_beams = 1, max_prompt_len = 1920)
+            # elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
+            #     '''
+            #         packed 알고리즘을 사용하긴 하지만 mlperf model처럼 total_block_space 를 줄여서 calib 해도 되는지 검증되지 않아 아직 최적화 적용 X
+            #         full model에 대해 OOM 발생할 수 있음.
+            #     '''
+            #     from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
+            #     generator_class = PagedAttentionGenerator
+            elif type(model) == furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu.GPTJForCausalLM: # GOLDEN MODEL
+                generator_class = "model_compressor.helper.QuantCausalLM"
+                max_length=2048
+
+            model_name_for_tokenizer = "EleutherAI/gpt-j-6B"
+            calib_dataloader, _ = (
+                calib_generator(
+                    calib_dataset_path,
+                    model,
+                    model_name_for_tokenizer,
+                    generator_class,
+                    AutoTokenizer,
+                    device=model.device,
+                    postprocess_func=postprocess_func,
+                    model_max_length=GPTJ_MAX_LEN,
+                    total_block_space=total_block_space,
+                    max_length=max_length
+                )
+            )
             
   
     run_autoscale = model_script.get("autoscale", 'disabled') != 'disabled'  
@@ -243,7 +279,6 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
         }
 
 
-
         if model_type in FURIOSA_GENERATOR_DICT.keys():
             generator = FURIOSA_GENERATOR_DICT[model_type]
             if generator == PagedAttentionGeneratorBeamSearch:
@@ -254,5 +289,5 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
-        else: 
+        else:
             return model_compressor.helper.QuantCausalLM(quant_models, model_type, input_names, concrete_args)
