@@ -10,6 +10,7 @@ import model_compressor
 from quantization.utils import get_kwargs, random_seed, set_optimization
 from quantization.get_quant_model import get_quant_model
 from quantization.calibrate import make_calib_dataloader, calibrate
+import pickle
 
 
 # Assume BLOCK_SIZE, NUM_BLOCKS, BUCKET_SIZE are fixed for now.
@@ -25,7 +26,6 @@ gen_kwargs = {
 }
 
 def load_pytorch_model(model_source, model_path, n_layers):
-        
     amp_dtype = torch.float32
     if model_source == 'furiosa_llm_rope':
         from furiosa_llm_models.llama.symbolic.huggingface_rope import LlamaForCausalLM
@@ -41,15 +41,15 @@ def load_pytorch_model(model_source, model_path, n_layers):
         model = model_cls.from_pretrained(
             model_path, 
             config=config_exp,
-            device_map="auto",
-            low_cpu_mem_usage=True,
+            #device_map="auto",
+            #low_cpu_mem_usage=True,
             torch_dtype=amp_dtype
         )
     else:
         model = model_cls.from_pretrained(
                 model_path,
-                device_map="auto",
-                low_cpu_mem_usage=True,
+                #device_map="auto",
+                #low_cpu_mem_usage=True,
                 torch_dtype=amp_dtype
             )
     print("Loaded model")
@@ -73,72 +73,116 @@ def gen_test_data(data_path, n_data=1):
     
     for input_token in input_tokens[:n_data]:
         test_data = {
-                "input_ids": torch.tensor(input_token, dtype=torch.int32, device='cuda').view(1,-1),
-                "attention_mask": torch.ones((1,len(input_token)), dtype=torch.int32, device='cuda'),
+                "input_ids": torch.tensor(input_token, dtype=torch.int32, device='cpu').view(1,-1),
+                "attention_mask": torch.ones((1,len(input_token)), dtype=torch.int32, device='cpu'),
             }
             
     return test_data
 
 
-def is_logit_same(
-    golden_file_path,
-    comparison_model_file_path,
-    mcm_name_to_check,
-    decode=False,
-):
-    import pickle
-
-    import torch
-
-    comparison_file = open(comparison_model_file_path, "rb")
-
-    read_golden_file = True
-
-    with open(golden_file_path, "rb") as golden_file:
-        while read_golden_file:
+def load_all_tensors_from_pickle(file_path, mcm_module_name):
+    tensor_list = []
+    with open(file_path, "rb") as file:
+        while True:
             try:
-                golden_result = pickle.load(golden_file)
-                golden_layer_name = next(iter(golden_result))
-
-                if (
-                    mcm_name_to_check is not None
-                    and not mcm_name_to_check in golden_layer_name
-                ):
-                    continue
-
-                while True:
-                    comparison_result = pickle.load(comparison_file)
-                    comparison_layer_name = next(iter(comparison_result))
-
-                    if golden_layer_name in comparison_layer_name:
-                        read_golden_file = False
-                        break
-
+                result_tensor = pickle.load(file)
+                layer_name = next(iter(result_tensor))
+                if mcm_module_name in layer_name:
+                    tensor_list.append(result_tensor[mcm_module_name]["output_before_rounding"])
+                    
             except EOFError:
-                print(
-                    f"It's end of file. Please check file path {golden_file_path} again."
-                )
                 break
+    return tensor_list
+            
 
-    golden_result = golden_result[golden_layer_name]
-    comparison_result = comparison_result[comparison_layer_name]
+def check_logits(
+    golden_model_file_path,
+    comparison_model_file_path,
+    mcm_module_name,
+    is_decode,
+):
 
-    try:
-        valid_golden_output = golden_result["output_before_rounding"]
-        valid_seq_len = valid_golden_output.shape[1] if not decode else 1
-        valid_comparison_output = comparison_result["output_before_rounding"][:, -valid_seq_len:, :]
-    except:  # noqa: E722
-        valid_golden_output = golden_result["output"]
-        valid_seq_len = valid_golden_output.shape[1] if not decode else 1
-        valid_comparison_output = comparison_result["output"][:, -valid_seq_len:, :]
+    golden_tensor_list = load_all_tensors_from_pickle(golden_model_file_path, mcm_module_name)
+    comparison_tensor_list = load_all_tensors_from_pickle(comparison_model_file_path, mcm_module_name)
+    
 
-    if valid_golden_output.dtype != valid_comparison_output.dtype:
-        raise ValueError("Invalid values to compare.")
+    assert len(golden_tensor_list) == len(comparison_tensor_list)
+    
+    for idx in range(len(golden_tensor_list)):
+        valid_seq_len = golden_tensor_list[idx].shape[1] if not is_decode else 1
+        
+        if golden_tensor_list[idx].shape[0] != comparison_tensor_list[idx].shape[0]: 
+            #If true, packing would have been applied in furiosa-llm-generator due to the short length of input_ids
+            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :][0].unsqueeze(0), comparison_tensor_list[idx][:, -valid_seq_len:, :])
+        else:
+            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :], comparison_tensor_list[idx][:, -valid_seq_len:, :])
 
-    if not torch.equal(valid_golden_output, valid_comparison_output):
+        if not is_successful:
             raise ValueError("Logits comparison test failed.")
-
+        
     return True
+    
+
+
+# def is_logit_same(
+#     golden_file_path,
+#     comparison_model_file_path,
+#     mcm_name_to_check,
+#     decode=False,
+# ):
+#     import pickle
+
+#     import torch
+
+#     comparison_file = open(comparison_model_file_path, "rb")
+
+#     read_golden_file = True
+
+#     with open(golden_file_path, "rb") as golden_file:
+#         while read_golden_file:
+#             try:
+#                 golden_result = pickle.load(golden_file)
+#                 golden_layer_name = next(iter(golden_result))
+
+#                 if (
+#                     mcm_name_to_check is not None
+#                     and not mcm_name_to_check in golden_layer_name
+#                 ):
+#                     continue
+
+#                 while True:
+#                     comparison_result = pickle.load(comparison_file)
+#                     comparison_layer_name = next(iter(comparison_result))
+
+#                     if golden_layer_name in comparison_layer_name:
+#                         read_golden_file = False
+#                         break
+
+#             except EOFError:
+#                 print(
+#                     f"It's end of file. Please check file path {golden_file_path} again."
+#                 )
+#                 break
+
+#     golden_result = golden_result[golden_layer_name]
+#     comparison_result = comparison_result[comparison_layer_name]
+
+#     try:
+#         valid_golden_output = golden_result["output_before_rounding"]
+#         valid_seq_len = valid_golden_output.shape[1] if not decode else 1
+#         valid_comparison_output = comparison_result["output_before_rounding"][:, -valid_seq_len:, :]
+#     except:  # noqa: E722
+#         valid_golden_output = golden_result["output"]
+#         valid_seq_len = valid_golden_output.shape[1] if not decode else 1
+#         valid_comparison_output = comparison_result["output"][:, -valid_seq_len:, :]
+
+#     if valid_golden_output.dtype != valid_comparison_output.dtype:
+#         raise ValueError("Invalid values to compare.")
+
+#     if not torch.equal(valid_golden_output, valid_comparison_output):
+#             raise ValueError("Logits comparison test failed.")
+
+#     return True
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -219,20 +263,21 @@ def test_model_equivalence():
     model_compressor.set_model_to_dump_golden_model(
         golden_file_path + '_prefill',
         golden_model.prefill_model,
-        dumping_range="qlv4_linear",
-        dumping_mode="only-in-out",
+        dumping_range='lm_head',
+        dumping_mode='only-in-out', 
         qlv4_skip_output_rounding=False,
         dumping_before_rounding=True,
-    )
+        dump_in_append_mode=True,)
+
     
     model_compressor.set_model_to_dump_golden_model(
         golden_file_path + '_decode',
         golden_model.decode_model,
-        dumping_range="qlv4_linear",
+        dumping_range="lm_head",    
         dumping_mode="only-in-out",
         qlv4_skip_output_rounding=False,
         dumping_before_rounding=True,
-    )
+        dump_in_append_mode=True)
     
     # generate
     with torch.no_grad():
@@ -251,20 +296,20 @@ def test_model_equivalence():
     model_compressor.set_model_to_dump_golden_model(
         mlperf_path + '_prefill',
         mlperf_model.prefill,
-        dumping_range="qlv4_linear",
+        dumping_range="lm_head",    
         dumping_mode="only-in-out",
         qlv4_skip_output_rounding=False,
         dumping_before_rounding=True,
-    )
+        dump_in_append_mode=True)
     
     model_compressor.set_model_to_dump_golden_model(
         mlperf_path + '_decode',
         mlperf_model.decode,
-        dumping_range="qlv4_linear",
+        dumping_range="lm_head",    
         dumping_mode="only-in-out",
         qlv4_skip_output_rounding=False,
         dumping_before_rounding=True,
-    )
+        dump_in_append_mode=True)
 
     # generate
     with torch.no_grad():
@@ -273,8 +318,8 @@ def test_model_equivalence():
     del model
     gc.collect()
 
-    is_logit_same(golden_file_path+'_prefill', mlperf_path+'_prefill', 'lm_head')
-    is_logit_same(golden_file_path+'_decode', mlperf_path+'_decode', 'lm_head', decode=True)
+    check_logits(golden_file_path+'_prefill', mlperf_path+'_prefill', mcm_module_name = 'lm_head', is_decode = False)
+    check_logits(golden_file_path+'_decode', mlperf_path+'_decode', mcm_module_name = 'lm_head', is_decode = True)
     print("Logits comparison test passed.")
     
 if __name__ == "__main__":
