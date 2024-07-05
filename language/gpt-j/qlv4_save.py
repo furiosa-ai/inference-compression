@@ -7,16 +7,18 @@ import model_compressor
 import joblib
 import argparse
 
+version='v3.12.1'
+model_source="mlperf_submission"
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", default="./model/", help="")
     parser.add_argument("--model_config", default="./ci_test_file/config.json", help="")
     parser.add_argument("--model_script_path", default="./quantization/model_script/Qlevel4_RGDA0-W8A8KV8-PTQ-SMQ-rope_lm-headint8.yaml", help="")
     parser.add_argument("--model_source", type = str, default = "mlperf_submission", help="the type of GPTJForCausalLM to use")
-    parser.add_argument('--qformat_path', type = str, default="./quantization/output/qformat_Qlevel4_RGDA0-W8A8KV8-PTQ-SMQ-mlperf_submission.yaml", help="")
-    parser.add_argument('--qparam_path', type = str, default="./quantization/output/qparam_Qlevel4_RGDA0-W8A8KV8-PTQ-SMQ-mlperf_submission.npy", help="")
-    parser.add_argument('--qlv4_prefill_out_path', type = str, default='./quantization/model_script/prefill.bin', help="")
-    parser.add_argument('--qlv4_decode_out_path', type = str, default='./quantization/model_script/decode.bin', help="")
+    parser.add_argument('--qformat_path', type = str, default=f'./quantization/output/{version}/{model_source}/qformat.yaml', help="")
+    parser.add_argument('--qparam_path', type = str, default=f'./quantization/output/{version}/{model_source}/qparam.npy', help="")
+    parser.add_argument('--qlv4_prefill_out_path', type = str, default=f'./quantization/output/{version}/{model_source}/prefill.bin', help="")
+    parser.add_argument('--qlv4_decode_out_path', type = str, default=f'./quantization/output/{version}/{model_source}/decode.bin', help="")
     args = parser.parse_args()
     return args
     

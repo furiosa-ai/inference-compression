@@ -118,7 +118,7 @@ def get_args():
         choices=[
             "huggingface_rngd_gelu",
             "mlperf_submission",
-            "experimental_huggingface_unsplit_packed",
+            "compact_causal_mask",
         ],
         help="choose model source",
     )
@@ -151,12 +151,12 @@ def qlv4_save():
     sut = None
     args.backend = "pytorch"
     args.max_examples = 1
-    args.recalibrate = True
+    args.recalibrate = False
     args.use_mcp = True
     args.accuracy = True
     args.torch_optim = "none"
     args.model_script_path = (
-        "./quantization/model_script/Qlevel4_RGDA0-W8A8KV8-PTQ.yaml"
+        "./quantization/model_script/Qlevel4_RGDA0-W8A8KV8-PTQ_submission.yaml"
     )
 
     from pytorch_SUT import get_pytorch_sut
@@ -174,7 +174,7 @@ def qlv4_save():
         output_path=args.output_path,
     )
 
-    if args.model_source =="mlperf_submission":
+    if args.model_source =="mlperf_submission" or args.model_source =="compact_causal_mask" :
         model = sut.model.model
     else:
         model= sut.model
