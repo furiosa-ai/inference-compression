@@ -72,19 +72,28 @@ def transform_past_key_shape(tensor, shape):
     else:
         raise TypeError("Unsupported tensor type")
 
-def postproc_for_PagedAttentionGeneratorBeamSearch(generator, cnt, **input_kwargs):
+def postproc_for_packed_algorithm(generator, cnt, **input_kwargs):
     batch_size=1
     block_size=1
     num_beams=1
 
-    input_kwargs['input_ids'] = input_kwargs['input_ids'][0,:]
-    input_kwargs['causal_mask'] = input_kwargs['causal_mask'][0,:]
-    input_kwargs['position_ids'] = input_kwargs['position_ids'][0,:]
-    input_kwargs['new_key_location'] = input_kwargs['new_key_location'][0,:]
-    input_kwargs['new_value_location'] = input_kwargs['new_value_location'][0,:]
+    input_kwargs['input_ids'] = input_kwargs['input_ids'][0,:].unsqueeze(dim=0) #postprocess => [1,2048]
+    input_kwargs['causal_mask'] = input_kwargs['causal_mask'][0,:].unsqueeze(dim=0)
+    input_kwargs['position_ids'] = input_kwargs['position_ids'][0,:].unsqueeze(dim=0)
+    input_kwargs['new_key_location'] = input_kwargs['new_key_location'][0,:].unsqueeze(dim=0)
+    input_kwargs['new_value_location'] = input_kwargs['new_value_location'][0,:].unsqueeze(dim=0)
 
     past_key_values = input_kwargs.get('past_key_values')
     # proprocessing
+    '''
+        OOM 이슈로 max_prompt_len=1920 기준으로 total_block_space를 잡아두도록 최적화 적용.
+        
+        참고)
+        paged attention calibration dataset의 num_block을 더욱 줄여서 실험
+        main: batch_size * num_beams * 2 * bucket_size* block_size  + 1 = 1*4*2*2048*1+1 = 16385
+        위의 실험:   batch_size * 2 * bucket_size* block_size  + 1 = 1*2*2048*1+1 = 4097
+        재실험: batch_size * 2 * max_prompt_len * block_size + 1 =  1*2*1920*1+1 = 3841
+    '''
     max_prompt_len = generator.bucket_size - generator.max_new_tokens
     num_blocks = batch_size * num_beams * 2 * (max_prompt_len) * block_size + 1 
     shape_info = list(past_key_values[0][0].shape)
