@@ -29,7 +29,7 @@ FURIOSA_GENERATOR_DICT = {
     
 }
 
-def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
+def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, num_beams = 4, kv_dtype = 'float32', max_prompt_len = None):
     #artibrary set to accomodate input prompt & generated summary
     
     if kv_dtype == 'float32':
@@ -41,7 +41,11 @@ def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 
     else:
         raise NotImplementedError
     
-    num_blocks = batch_size * 4  * 2 * (bucket_size) * block_size + 1
+    if max_prompt_len:
+        num_blocks = batch_size * num_beams * 2 * (max_prompt_len) * block_size + 1 
+    else:
+        num_blocks = batch_size  * num_beams * 2 * (bucket_size) * block_size + 1 
+
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
@@ -98,13 +102,13 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             calib_dataloader = make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
         else:
             postprocess_func=None
-
+            total_block_space=None
+            
             if type(model) == furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM:
                 from furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized import PagedAttentionGeneratorBeamSearch
                 generator_class = PagedAttentionGeneratorBeamSearch
                 postprocess_func=postproc_for_PagedAttentionGeneratorBeamSearch
-                bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
-                total_block_space=
+                bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32', num_beams = 1, max_prompt_len = 1920)
             elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
                 from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
                 generator_class = PagedAttentionGenerator
