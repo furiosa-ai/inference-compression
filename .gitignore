@@ -5,3 +5,4 @@ generated/
 aws/
 env_mlperf/
 logs/qllama2-70b/
+language/llama2-70b/run_outputs/
