@@ -84,7 +84,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=None, calib_without_padding=False, qformat_path = None, qparam_path = None, immigrate_qparams = False):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
     
