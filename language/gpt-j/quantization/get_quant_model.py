@@ -84,7 +84,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False,):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
     
@@ -100,6 +100,13 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             from .calibration_utils.paged_attention_utils import make_calib_dataloader_for_paged_attention
             bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader = make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
+            calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
+        elif type(model) in [furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM,]:
+            from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
+            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32', num_beams = 1, max_prompt_len = 1920) #kv_dtype are set as float32 to enable dummy forwarding before calibration.
+            calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
+        # elif type(model) == furiosa_llm_models.gptj.paged_attentin_rope
+        
         else:
             postprocess_func=None
             total_block_space=None
@@ -164,7 +171,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=calib_dataloader,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
         )
 
@@ -199,7 +206,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
                 act_dtype=model_script["act_dtype"],
                 act_nbits=model_script["act_nbits"],
                 kv_dtype=model_script["kv_dtype"] if  "kv_dtype" in model_script else 'bf16',
-                disable_inout=(True, True),
+                disable_inout=(True, False),
             )
 
 
@@ -225,7 +232,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=None,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             delete_org_weight=True,
         )
@@ -263,7 +270,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=None,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             # decode_phase = True,
             delete_org_weight=True,
@@ -286,7 +293,7 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=None,
-            disable_inout=(True, True),
+            disable_inout=(True, False),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
             delete_org_weight=True,
@@ -302,14 +309,11 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
 
         if model_type in FURIOSA_GENERATOR_DICT.keys():
             generator = FURIOSA_GENERATOR_DICT[model_type]
-            # if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
-            #     return generator(quant_causallm, bucket_size = 2048)
             if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
-                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
+                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8, return_tensors = True, num_beams = gen_kwargs["num_beams"])
             else:
-                
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)
