@@ -29,7 +29,7 @@ FURIOSA_GENERATOR_DICT = {
     
 }
 
-def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, num_beams = 4, kv_dtype = 'float32', max_prompt_len = None):
+def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 2048, kv_dtype = 'float32'):
     #artibrary set to accomodate input prompt & generated summary
     
     if kv_dtype == 'float32':
@@ -41,11 +41,7 @@ def get_total_block_space(config, batch_size = 1, block_size = 1, bucket_size = 
     else:
         raise NotImplementedError
     
-    if max_prompt_len:
-        num_blocks = batch_size * num_beams * 2 * (max_prompt_len) * block_size + 1 
-    else:
-        num_blocks = batch_size  * num_beams * 2 * (bucket_size) * block_size + 1 
-
+    num_blocks = batch_size * 4  * 2 * (bucket_size) * block_size + 1
     example_block_per_layer_shape = (
         num_blocks,
         block_size,
@@ -84,14 +80,9 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=None, calib_without_padding=False, qformat_path = None, qparam_path = None, immigrate_qparams = False):
+def get_quant_model_immigration(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
-    
-    if qformat_path is None and qparam_path is None:
-        qformat_path = f"./quantization/output/qformat_{model_script_path.split('.')[1].split('/')[-1]}.yaml" 
-        qparam_path = f"./quantization/output/qparam_{model_script_path.split('.')[1].split('/')[-1]}.npy"
-    
     
     if os.path.exists(qformat_path) and os.path.exists(qparam_path) and recalibrate == False:
         calib_dataloader = None
@@ -102,7 +93,7 @@ def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=No
             calib_dataloader =  make_calib_dataloader_for_paged_attention(calib_dataset_path, model_script['calib_batch_size'], bucket_size, total_block_space)
         elif type(model) in [furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM,]:
             from .calibration_utils.paged_attention_optimized_packed_utils import make_calib_dataloader_for_paged_attention_packed
-            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32', num_beams = 1, max_prompt_len = 1920) #kv_dtype are set as float32 to enable dummy forwarding before calibration.
+            bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32') #kv_dtype are set as float32 to enable dummy forwarding before calibration.
             calib_dataloader =  make_calib_dataloader_for_paged_attention_packed(calib_dataset_path, model.config, model_script['calib_batch_size'], bucket_size, total_block_space)
         # elif type(model) == furiosa_llm_models.gptj.paged_attentin_rope
         
@@ -143,7 +134,7 @@ def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=No
             target_machine=model_script["target_machine"],
             act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
             dataloader=calib_dataloader,
-            disable_inout=(True, False),
+            disable_inout=(True, True),
             kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
         )
 
@@ -178,7 +169,7 @@ def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=No
                 act_dtype=model_script["act_dtype"],
                 act_nbits=model_script["act_nbits"],
                 kv_dtype=model_script["kv_dtype"] if  "kv_dtype" in model_script else 'bf16',
-                disable_inout=(True, False),
+                disable_inout=(True, True),
             )
 
 
@@ -192,8 +183,20 @@ def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=No
             decode_model,
             qformat_path = qformat_path,
             qparam_path = qparam_path,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            dataloader=None,
+            disable_inout=(True, True),
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             delete_org_weight=True,
         )
         generator = FURIOSA_GENERATOR_DICT[model_type]
@@ -218,19 +221,51 @@ def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=No
             traced_models["prefill"],
             qformat_path = qformat_path,
             qparam_path = qparam_path,
-            qlevel=model_script["qlevel"],
+            qlevel=2,
             target_machine=model_script["target_machine"],
-            # decode_phase = True,
             delete_org_weight=True,
             immigrate_qparams = immigrate_qparams,
         )
+        
+        new_qformat_path = './ci_test_file/qformat_v3.12_gptj_immigrate.yaml'
+        new_qparam_path = './ci_test_file/qparam_v3.12_gptj_immigrate.npy'
+        
+        model_compressor.save(
+                prefill_model,
+                qparam_out_path=new_qparam_path,
+                qformat_out_path=new_qformat_path,
+                weight_calib_method=model_script["weight_calib_method"],
+                weight_granularity=model_script["weight_granularity"],
+                weight_dtype=model_script["weight_dtype"],
+                weight_nbits=model_script["weight_nbits"],
+                act_calib_method=model_script["act_calib_method"],
+                act_granularity=model_script["act_granularity"],
+                act_dtype=model_script["act_dtype"],
+                act_nbits=model_script["act_nbits"],
+                kv_dtype=model_script["kv_dtype"] if  "kv_dtype" in model_script else 'bf16',
+                disable_inout=(True, True),
+            )
+        
+        exit()
 
         decode_model = model_compressor.create_quantsim_model(
             traced_models["decode"],
             qformat_path = qformat_path,
             qparam_path = qparam_path,
+            weight_calib_method=model_script["weight_calib_method"],
+            weight_granularity=model_script["weight_granularity"],
+            weight_dtype=model_script["weight_dtype"],
+            weight_nbits=model_script["weight_nbits"],
+            act_calib_method=model_script["act_calib_method"],
+            act_granularity=model_script["act_granularity"],
+            act_dtype=model_script["act_dtype"],
+            act_nbits=model_script["act_nbits"],
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
+            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
+            dataloader=None,
+            disable_inout=(True, True),
+            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
             delete_org_weight=True,
             quantized_prefill_model=prefill_model,
@@ -246,11 +281,14 @@ def get_quant_model(model, model_script_path, recalibrate, calib_dataset_path=No
 
         if model_type in FURIOSA_GENERATOR_DICT.keys():
             generator = FURIOSA_GENERATOR_DICT[model_type]
+            # if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
+            #     return generator(quant_causallm, bucket_size = 2048)
             if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
-                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8, return_tensors = True, num_beams = gen_kwargs["num_beams"])
+                return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
             else:
+                
                 quant_causallm = model_compressor.helper.QuantCausalLM(quant_models, model_type)
                 bucket_size, total_block_space = get_total_block_space(prefill_model.config, kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16')
                 return generator(quant_causallm, total_block_space, bucket_size)

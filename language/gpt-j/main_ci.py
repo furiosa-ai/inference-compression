@@ -8,6 +8,7 @@ from quantization import calibration_utils
 import model_compressor
 from dataset import Dataset
 import joblib
+import pickle
 
 
 
@@ -20,59 +21,51 @@ gen_kwargs = {
 }
 
 
-def is_logit_same(
-    golden_model_file_path,
-    comparison_model_file_path,
-    mcm_name_to_check,
-    decode=False,
-):
-    import pickle
 
-    import torch
-
-    comparison_file = open(comparison_model_file_path, "rb")
-
-    read_golden_file = True
-
-    with open(golden_model_file_path, "rb") as golden_file:
-        while read_golden_file:
+def load_all_tensors_from_pickle(file_path, mcm_module_name):
+    tensor_list = []
+    with open(file_path, "rb") as file:
+        while True:
             try:
-                golden_result = pickle.load(golden_file)
-                golden_layer_name = next(iter(golden_result))
-
-                if (
-                    mcm_name_to_check is not None
-                    and not mcm_name_to_check in golden_layer_name
-                ):
-                    continue
-
+                result_tensor = pickle.load(file)
+                layer_name = next(iter(result_tensor))
+                if mcm_module_name in layer_name:
+                    tensor_list.append(result_tensor[mcm_module_name]["output_before_rounding"])
+                    
             except EOFError:
                 break
-
-
-        while True:
-            comparison_result = pickle.load(comparison_file)
-            comparison_layer_name = next(iter(comparison_result))
-
-            if golden_layer_name in comparison_layer_name:
-                read_golden_file = False
-                break
+    return tensor_list
             
-    golden_result = golden_result[golden_layer_name]
-    comparison_result = comparison_result[comparison_layer_name]
 
+def check_logits(
+    golden_model_file_path,
+    comparison_model_file_path,
+    mcm_module_name,
+    is_decode,
+):
 
-    valid_golden_output = golden_result["output_before_rounding"]
-    valid_seq_len = valid_golden_output.shape[1] if not decode else 1
-    valid_comparison_output = comparison_result["output_before_rounding"][:, -valid_seq_len:, :]
+    golden_tensor_list = load_all_tensors_from_pickle(golden_model_file_path, mcm_module_name)
+    comparison_tensor_list = load_all_tensors_from_pickle(comparison_model_file_path, mcm_module_name)
     
-    if not torch.equal(valid_golden_output[0].unsqueeze(0), valid_comparison_output[0].unsqueeze(0)):
-        raise ValueError("Logits comparison test failed.")
+
+    assert len(golden_tensor_list) == len(comparison_tensor_list)
     
+    for idx in range(len(golden_tensor_list)):
+        valid_seq_len = golden_tensor_list[idx].shape[1] if not is_decode else 1
+        
+        if golden_tensor_list[idx].shape[0] != comparison_tensor_list[idx].shape[0]: 
+            #If true, packing would have been applied in furiosa-llm-generator due to the short length of input_ids
+            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :][0].unsqueeze(0), comparison_tensor_list[idx][:, -valid_seq_len:, :])
+        else:
+            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :], comparison_tensor_list[idx][:, -valid_seq_len:, :])
+
+        if not is_successful:
+            raise ValueError("Logits comparison test failed.")
+        
     return True
     
-    
-    
+
+
 
 #load model_script
 def compare_model_outputs():
@@ -85,12 +78,13 @@ def compare_model_outputs():
     golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
     
     #To test without downloading the MLPerf model, load the model as below.
-    #config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
-    #golden_model = GPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", config=config).to(device)
-    
-    
-    calib_dataset_path = './ci_test_file/calibration_dataset_20.json'
-    evaluation_dataset_path = './ci_test_file/evaluation_dataset_short.json'
+    # model_path = "EleutherAI/gpt-j-6B"
+    # model_config = AutoConfig.from_pretrained("EleutherAI/gpt-j-6B")
+    # golden_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
+
+
+    calib_dataset_path = './ci_test_file/calibration_dataset.json'
+    evaluation_dataset_path = './ci_test_file/evaluation_dataset.json'
     model_script_path = './ci_test_file/model_script.yaml'
     qformat_path = './ci_test_file/golden_qformat.yaml'
     qparam_path = './ci_test_file/golden_qparam.npy'
@@ -108,8 +102,7 @@ def compare_model_outputs():
            
     from furiosa_llm_models.gptj.symbolic.mlperf_submission import GPTJForCausalLM
     submission_model = GPTJForCausalLM.from_pretrained(model_path, config=model_config).to(device)
-    
-    
+
     submission_generator = quantization.get_quant_model(model = submission_model, 
                                                      calib_dataset_path = calib_dataset_path, 
                                                      model_script_path = model_script_path, 
@@ -120,41 +113,46 @@ def compare_model_outputs():
                                                      immigrate_qparams = True)
     
     
-    #Turn on dumping 
+    #Turn on mcp dump
     model_compressor.set_model_to_dump_golden_model(
-                './ci_test_file/golden_prefill_logits.pkl',
-                golden_model_generator.prefill_model,
-                dumping_range='qlv4_linear',
-                dumping_mode='only-in-out', 
-                qlv4_skip_output_rounding=False,
-                dumping_before_rounding=True,
-            )
+            './ci_test_file/golden_prefill_logits.pkl',
+            golden_model_generator.prefill_model,
+            dumping_range='lm_head',
+            dumping_mode='only-in-out', 
+            qlv4_skip_output_rounding=False,
+            dumping_before_rounding=True,
+            dump_in_append_mode=True,)
+    
     model_compressor.set_model_to_dump_golden_model(
-                './ci_test_file/golden_decode_logits.pkl',
-                golden_model_generator.decode_model,
-                dumping_range='qlv4_linear',
-                dumping_mode='only-in-out', 
-                qlv4_skip_output_rounding=False,
-                dumping_before_rounding=True,
-            )
+            './ci_test_file/golden_decode_logits.pkl',
+            golden_model_generator.decode_model,
+            dumping_range="lm_head",    
+            dumping_mode="only-in-out",
+            qlv4_skip_output_rounding=False,
+            dumping_before_rounding=True,
+            dump_in_append_mode=True)
+    
     model_compressor.set_model_to_dump_golden_model(
-                './ci_test_file/submission_prefill_logits.pkl',
-                submission_generator.prefill,
-                dumping_range='qlv4_linear',
-                dumping_mode='only-in-out', 
-                qlv4_skip_output_rounding=False,
-                dumping_before_rounding=True,
-            )
+            './ci_test_file/submission_prefill_logits.pkl',
+            submission_generator.prefill,
+            dumping_range='lm_head',
+            dumping_mode='only-in-out', 
+            qlv4_skip_output_rounding=False,
+            dumping_before_rounding=True,
+            dump_in_append_mode=True)
+    
     model_compressor.set_model_to_dump_golden_model(
-                './ci_test_file/submission_decode_logits.pkl',
-                submission_generator.decode,
-                dumping_range='qlv4_linear',
-                dumping_mode='only-in-out', 
-                qlv4_skip_output_rounding=False,
-                dumping_before_rounding=True,
-            )
+        './ci_test_file/submission_decode_logits.pkl',
+        submission_generator.decode,
+        dumping_range="lm_head",     #layer_name to dump
+        dumping_mode="only-in-out",
+        qlv4_skip_output_rounding=False,
+        dumping_before_rounding=True,
+        dump_in_append_mode=True        #enable append mode
+        )
     
     
+
 
     validation_dataset = Dataset(dataset_path = evaluation_dataset_path)
     
@@ -167,19 +165,21 @@ def compare_model_outputs():
         input_batch['attention_mask'] = validation_dataset.source_encoded_attn_masks[idx].to(device)
         seq_len = input_batch['input_ids'].shape[1]
         output_batch_golden = golden_model_generator.generate(**input_batch, **gen_kwargs, pad_token_id = model_config.eos_token_id)
-        output_batch_submission = submission_generator.generate(**input_batch, max_length = seq_len+3, min_new_tokens = 10)
-        #output_batch_submission = submission_generator.generate(**input_batch, max_length=2048, **gen_kwargs)
+        output_batch_submission = submission_generator.generate(**input_batch, **gen_kwargs)
+
+    
+   
+    check_logits(golden_model_file_path='./ci_test_file/golden_prefill_logits.pkl',
+                    comparison_model_file_path ='./ci_test_file/submission_prefill_logits.pkl',
+                    mcm_module_name = 'lm_head',
+                    is_decode = False)
+
+    check_logits(golden_model_file_path='./ci_test_file/golden_decode_logits.pkl',
+                    comparison_model_file_path ='./ci_test_file/submission_decode_logits.pkl',
+                    mcm_module_name = 'lm_head',
+                    is_decode = True)
 
 
-    is_logit_same(golden_model_file_path='./ci_test_file/golden_prefill_logits.pkl',
-                  comparison_model_file_path = './ci_test_file/submission_prefill_logits.pkl', 
-                  mcm_name_to_check='lm_logits')
-    
-    is_logit_same(golden_model_file_path='./ci_test_file/golden_decode_logits.pkl',
-                  comparison_model_file_path ='./ci_test_file/submission_decode_logits.pkl',
-                  mcm_name_to_check='lm_logits',
-                  decode = True)
-    
     print("gptj forward ci test is passed")
     
     
