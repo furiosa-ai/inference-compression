@@ -81,7 +81,7 @@ def main():
     )
 
     if args.use_mcp:
-        sut.model = quantization.get_quant_model(sut.model, args.calib_dataset_path, args.model_script_path, args.calib_without_padding, args.recalibrate, args.qformat_path, args.qparam_path)
+        sut.model = quantization.get_quant_model(sut.model, args.model_script_path, args.recalibrate, args.calib_dataset_path, args.calib_without_padding, args.qformat_path, args.qparam_path)
 
     settings = lg.TestSettings()
     settings.scenario = scenario_map[args.scenario]
