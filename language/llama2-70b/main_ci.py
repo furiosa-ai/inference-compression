@@ -13,6 +13,34 @@ from quantization.calibrate import make_calib_dataloader, calibrate
 import pickle
 
 
+def check_logits(
+    golden_model_file_path,
+    comparison_model_file_path,
+    mcm_module_name,
+    is_decode,
+):
+
+    golden_tensor_list = load_all_tensors_from_pickle(golden_model_file_path, mcm_module_name)
+    comparison_tensor_list = load_all_tensors_from_pickle(comparison_model_file_path, mcm_module_name)
+    
+
+    assert len(golden_tensor_list) == len(comparison_tensor_list)
+    
+    
+    for idx in range(len(golden_tensor_list)):
+        valid_seq_len = golden_tensor_list[idx].shape[1] if not is_decode else 1
+        
+        if golden_tensor_list[idx].shape[0] != comparison_tensor_list[idx].shape[0]: 
+            #If true, packing would have been applied in furiosa-llm-generator due to the short length of input_ids
+            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :][0].unsqueeze(0), comparison_tensor_list[idx][:, -valid_seq_len:, :])
+        else:
+            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :], comparison_tensor_list[idx][:, -valid_seq_len:, :])
+
+        if not is_successful:
+            raise ValueError("Logits comparison test failed.")
+        
+    return True
+
 # Assume BLOCK_SIZE, NUM_BLOCKS, BUCKET_SIZE are fixed for now.
 BLOCK_SIZE = 1
 # bucket size would simply be a max value such as 2048 since we only provide one bucket
@@ -97,34 +125,7 @@ def load_all_tensors_from_pickle(file_path, mcm_module_name):
     return tensor_list
             
 
-def check_logits(
-    golden_model_file_path,
-    comparison_model_file_path,
-    mcm_module_name,
-    is_decode,
-):
 
-    golden_tensor_list = load_all_tensors_from_pickle(golden_model_file_path, mcm_module_name)
-    comparison_tensor_list = load_all_tensors_from_pickle(comparison_model_file_path, mcm_module_name)
-    
-
-    assert len(golden_tensor_list) == len(comparison_tensor_list)
-    
-    
-    for idx in range(len(golden_tensor_list)):
-        valid_seq_len = golden_tensor_list[idx].shape[1] if not is_decode else 1
-        
-        if golden_tensor_list[idx].shape[0] != comparison_tensor_list[idx].shape[0]: 
-            #If true, packing would have been applied in furiosa-llm-generator due to the short length of input_ids
-            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :][0].unsqueeze(0), comparison_tensor_list[idx][:, -valid_seq_len:, :])
-        else:
-            is_successful = torch.equal(golden_tensor_list[idx][:, -valid_seq_len:, :], comparison_tensor_list[idx][:, -valid_seq_len:, :])
-
-        if not is_successful:
-            raise ValueError("Logits comparison test failed.")
-        
-    return True
-    
 
 
 def get_args():
