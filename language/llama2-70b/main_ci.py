@@ -176,6 +176,7 @@ def get_args():
                  ], 
         help="choose model source"
     )
+    parser.add_argument("--weighted_op_emul_dtype", type=str, default="fp64", help="set emulation type of weighted operators")
     args = parser.parse_args()
     return args
 
