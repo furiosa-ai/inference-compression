@@ -8,8 +8,7 @@ from typing import Optional
 from dataset import Dataset
 import copy
 
-
-
+from furiosa_llm_models.generators.mlperf_submission_generator_mcp import PagedAttentionGeneratorBeamSearch
 
 gen_kwargs = {
     "early_stopping": True,
@@ -21,7 +20,7 @@ gen_kwargs = {
 
 
 FURIOSA_GENERATOR_DICT = {
-    furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM : furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch,
+    furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM : PagedAttentionGeneratorBeamSearch,
     # furiosa_llm_models.gptj.symbolic.preallocated_concat_rope.GPTJForCausalLM : furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator,
     furiosa_llm_models.gptj.symbolic.paged_attention_rope.GPTJForCausalLM: furiosa_llm_models.generators.symbolic.quant_paged_attention_generator.QuantPagedAttentionGenerator,
     # furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM: furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search.PagedAttentionGeneratorBeamSearch,
@@ -283,7 +282,7 @@ def get_quant_model_immigration(model, calib_dataset_path, model_script_path, ca
             generator = FURIOSA_GENERATOR_DICT[model_type]
             # if generator == furiosa_llm_models.generators.symbolic.quant_preallocated_concat_generator.QuantPreAllocatedConcatGenerator:
             #     return generator(quant_causallm, bucket_size = 2048)
-            if generator == furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized.PagedAttentionGeneratorBeamSearch:
+            if generator == PagedAttentionGeneratorBeamSearch:
                 quant_models["prefill_model"].concrete_args = concrete_args["prefill_concrete_args"]
                 quant_models["decode_model"].concrete_args = concrete_args["decode_concrete_args"]
                 return generator(prefill=quant_models["prefill_model"], decode=quant_models["decode_model"], kv_dtype=torch.int8)
