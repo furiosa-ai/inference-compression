@@ -86,7 +86,7 @@ def get_quant_model(model, args, immigrate_qparams=False):
         qlevel=quant_config["qlevel"],
         target_machine=quant_config["target_machine"],
         delete_org_weight=True,
-        weighted_op_emul_dtype='fp32',
+        weighted_op_emul_dtype=args.weighted_op_emul_dtype,
         immigrate_qparams=immigrate_qparams,
     )
 
@@ -99,7 +99,7 @@ def get_quant_model(model, args, immigrate_qparams=False):
         decode_phase=True,
         quantized_prefill_model=prefill_quantized_model,
         delete_org_weight=True,
-        weighted_op_emul_dtype='fp32',
+        weighted_op_emul_dtype=args.weighted_op_emul_dtype,
         immigrate_qparams=immigrate_qparams,
     )
 
