@@ -113,19 +113,19 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             max_length=None
 
             if type(model) == furiosa_llm_models.gptj.symbolic.mlperf_submission.GPTJForCausalLM: # MLPERF_SUBMISSION MODEL
-                from furiosa_llm_models.generators.paged_attention_optimized_generator_beam_search_optimized import PagedAttentionGeneratorBeamSearch
+                # from furiosa_llm_models.generators.mlperf_submission_generator_mcp import PagedAttentionGeneratorBeamSearch
                 generator_class = PagedAttentionGeneratorBeamSearch
                 # prostprocessing : OOM issue 해결용 최적화
                 max_length=100
                 postprocess_func=postproc_for_packed_algorithm 
                 bucket_size, total_block_space = get_total_block_space(model.config, kv_dtype = 'float32', num_beams = 1, max_prompt_len = 1920)
-            elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
-                '''
-                    packed 알고리즘을 사용하긴 하지만 mlperf model처럼 total_block_space 를 줄여서 calib 해도 되는지 검증되지 않아 아직 최적화 적용 X
-                    full model에 대해 OOM 발생할 수 있음.
-                '''
-                from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
-                generator_class = PagedAttentionGenerator
+            # elif type(model) == furiosa_llm_models.gptj.symbolic.paged_attention_optimized_packed_rope.GPTJForCausalLM:
+            #     '''
+            #         packed 알고리즘을 사용하긴 하지만 mlperf model처럼 total_block_space 를 줄여서 calib 해도 되는지 검증되지 않아 아직 최적화 적용 X
+            #         full model에 대해 OOM 발생할 수 있음.
+            #     '''
+            #     from furiosa_llm_models.generators.paged_attention_optimized_generator import PagedAttentionGenerator 
+            #     generator_class = PagedAttentionGenerator
             elif type(model) == furiosa_llm_models.gptj.symbolic.huggingface_rope_rngd_gelu.GPTJForCausalLM: # GOLDEN MODEL
                 generator_class = "model_compressor.helper.QuantCausalLM"
                 max_length=2048
