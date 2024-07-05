@@ -104,7 +104,7 @@ def get_quant_model(model, args, immigrate_qparams=False):
     )
 
     if model_type == furiosa_llm_models.llama.symbolic.mlperf_submission.LlamaForCausalLM:
-        from furiosa_llm_models.generators.symbolic.llama_multi_gpu_paged_attention_optimized_generator import PagedAttentionGenerator
+        from furiosa_llm_models.generators.symbolic.llama_multi_gpu_paged_attention_optimized_generator_mcp import PagedAttentionGenerator
         kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16'
 
         generator = PagedAttentionGenerator(
