@@ -84,7 +84,7 @@ def get_autoscale_calib_config(model_script, model, calib_dataloader):
 
 
 
-def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False,):
+def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_padding, recalibrate, qformat_path = None, qparam_path = None, immigrate_qparams = False):
     # Load model script and calibration dataloader (Refer to inference-compression/language/gpt-j/README.md on how to download evaluation and calibration dataset )
     model_script = load_model_script(model_script_path)
     
@@ -192,20 +192,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             decode_model,
             qformat_path = qformat_path,
             qparam_path = qparam_path,
-            weight_calib_method=model_script["weight_calib_method"],
-            weight_granularity=model_script["weight_granularity"],
-            weight_dtype=model_script["weight_dtype"],
-            weight_nbits=model_script["weight_nbits"],
-            act_calib_method=model_script["act_calib_method"],
-            act_granularity=model_script["act_granularity"],
-            act_dtype=model_script["act_dtype"],
-            act_nbits=model_script["act_nbits"],
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
-            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
-            dataloader=None,
-            disable_inout=(True, False),
-            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             delete_org_weight=True,
         )
         generator = FURIOSA_GENERATOR_DICT[model_type]
@@ -230,20 +218,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             traced_models["prefill"],
             qformat_path = qformat_path,
             qparam_path = qparam_path,
-            weight_calib_method=model_script["weight_calib_method"],
-            weight_granularity=model_script["weight_granularity"],
-            weight_dtype=model_script["weight_dtype"],
-            weight_nbits=model_script["weight_nbits"],
-            act_calib_method=model_script["act_calib_method"],
-            act_granularity=model_script["act_granularity"],
-            act_dtype=model_script["act_dtype"],
-            act_nbits=model_script["act_nbits"],
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
-            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
-            dataloader=None,
-            disable_inout=(True, False),
-            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             # decode_phase = True,
             delete_org_weight=True,
             immigrate_qparams = immigrate_qparams,
@@ -253,20 +229,8 @@ def get_quant_model(model, calib_dataset_path, model_script_path, calib_without_
             traced_models["decode"],
             qformat_path = qformat_path,
             qparam_path = qparam_path,
-            weight_calib_method=model_script["weight_calib_method"],
-            weight_granularity=model_script["weight_granularity"],
-            weight_dtype=model_script["weight_dtype"],
-            weight_nbits=model_script["weight_nbits"],
-            act_calib_method=model_script["act_calib_method"],
-            act_granularity=model_script["act_granularity"],
-            act_dtype=model_script["act_dtype"],
-            act_nbits=model_script["act_nbits"],
             qlevel=model_script["qlevel"],
             target_machine=model_script["target_machine"],
-            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
-            dataloader=None,
-            disable_inout=(True, False),
-            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
             decode_phase = True,
             delete_org_weight=True,
             quantized_prefill_model=prefill_model,
