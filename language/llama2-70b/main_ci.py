@@ -21,6 +21,7 @@ BUCKET_SIZE = 2048
 gen_kwargs = {
     "early_stopping": True,
     "min_new_tokens": 1,
+    "max_new_tokens": 1024,
     "num_beams": 1,
     "do_sample": False
 }
@@ -41,15 +42,15 @@ def load_pytorch_model(model_source, model_path, n_layers):
         model = model_cls.from_pretrained(
             model_path, 
             config=config_exp,
-            #device_map="auto",
-            #low_cpu_mem_usage=True,
+            device_map="auto",
+            low_cpu_mem_usage=True,
             torch_dtype=amp_dtype
         )
     else:
         model = model_cls.from_pretrained(
                 model_path,
-                #device_map="auto",
-                #low_cpu_mem_usage=True,
+                device_map="auto",
+                low_cpu_mem_usage=True,
                 torch_dtype=amp_dtype
             )
     print("Loaded model")
@@ -73,11 +74,12 @@ def gen_test_data(data_path, n_data=1):
     
     for input_token in input_tokens[:n_data]:
         test_data = {
-                "input_ids": torch.tensor(input_token, dtype=torch.int32, device='cpu').view(1,-1),
-                "attention_mask": torch.ones((1,len(input_token)), dtype=torch.int32, device='cpu'),
+                "input_ids": torch.tensor(input_token, dtype=torch.int32, device='cuda').view(1,-1),
+                "attention_mask": torch.ones((1,len(input_token)), dtype=torch.int32, device='cuda'),
             }
+        data_list.append(test_data)
             
-    return test_data
+    return data_list
 
 
 def load_all_tensors_from_pickle(file_path, mcm_module_name):
@@ -108,6 +110,7 @@ def check_logits(
 
     assert len(golden_tensor_list) == len(comparison_tensor_list)
     
+    
     for idx in range(len(golden_tensor_list)):
         valid_seq_len = golden_tensor_list[idx].shape[1] if not is_decode else 1
         
@@ -123,66 +126,6 @@ def check_logits(
     return True
     
 
-
-# def is_logit_same(
-#     golden_file_path,
-#     comparison_model_file_path,
-#     mcm_name_to_check,
-#     decode=False,
-# ):
-#     import pickle
-
-#     import torch
-
-#     comparison_file = open(comparison_model_file_path, "rb")
-
-#     read_golden_file = True
-
-#     with open(golden_file_path, "rb") as golden_file:
-#         while read_golden_file:
-#             try:
-#                 golden_result = pickle.load(golden_file)
-#                 golden_layer_name = next(iter(golden_result))
-
-#                 if (
-#                     mcm_name_to_check is not None
-#                     and not mcm_name_to_check in golden_layer_name
-#                 ):
-#                     continue
-
-#                 while True:
-#                     comparison_result = pickle.load(comparison_file)
-#                     comparison_layer_name = next(iter(comparison_result))
-
-#                     if golden_layer_name in comparison_layer_name:
-#                         read_golden_file = False
-#                         break
-
-#             except EOFError:
-#                 print(
-#                     f"It's end of file. Please check file path {golden_file_path} again."
-#                 )
-#                 break
-
-#     golden_result = golden_result[golden_layer_name]
-#     comparison_result = comparison_result[comparison_layer_name]
-
-#     try:
-#         valid_golden_output = golden_result["output_before_rounding"]
-#         valid_seq_len = valid_golden_output.shape[1] if not decode else 1
-#         valid_comparison_output = comparison_result["output_before_rounding"][:, -valid_seq_len:, :]
-#     except:  # noqa: E722
-#         valid_golden_output = golden_result["output"]
-#         valid_seq_len = valid_golden_output.shape[1] if not decode else 1
-#         valid_comparison_output = comparison_result["output"][:, -valid_seq_len:, :]
-
-#     if valid_golden_output.dtype != valid_comparison_output.dtype:
-#         raise ValueError("Invalid values to compare.")
-
-#     if not torch.equal(valid_golden_output, valid_comparison_output):
-#             raise ValueError("Logits comparison test failed.")
-
-#     return True
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -253,9 +196,11 @@ def test_model_equivalence():
         )
 
     
+
+    
     # gen test_data
-    test_data = gen_test_data(args.dataset_path)
-    seq_len = test_data['input_ids'].shape[1]
+    test_data_list = gen_test_data(args.dataset_path, n_data = 2)
+
 
     # create quant golden model and activate dump mode
     golden_file_path = "./golden_dump"
@@ -278,10 +223,12 @@ def test_model_equivalence():
         qlv4_skip_output_rounding=False,
         dumping_before_rounding=True,
         dump_in_append_mode=True)
-    
-    # generate
+        # generate
     with torch.no_grad():
-       output = golden_model.generate(**test_data, max_length=seq_len+2, **gen_kwargs)
+        for test_data in test_data_list:
+            output = golden_model.generate(**test_data, **gen_kwargs)
+    
+
     del golden_model
     del model
     gc.collect()
@@ -313,7 +260,10 @@ def test_model_equivalence():
 
     # generate
     with torch.no_grad():
-        output = mlperf_model.generate(**test_data, max_length=seq_len+2, **gen_kwargs)
+        for test_data in test_data_list:
+            seq_len = test_data['input_ids'].shape[1]
+            output = mlperf_model.generate(**test_data, max_length=seq_len+gen_kwargs["max_new_tokens"])
+
     del mlperf_model
     del model
     gc.collect()
