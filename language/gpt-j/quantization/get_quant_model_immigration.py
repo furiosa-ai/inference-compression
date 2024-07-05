@@ -223,10 +223,6 @@ def get_quant_model_immigration(model, calib_dataset_path, model_script_path, ca
             qparam_path = qparam_path,
             qlevel=2,
             target_machine=model_script["target_machine"],
-            act_zp_equalizing=(model_script["act_zp_equalizing"] if model_script["act_zp_equalizing"] else 'disabled'),
-            disable_inout=(True, True),
-            kv_dtype = model_script["kv_dtype"] if "kv_dtype" in model_script else 'bf16',
-            # decode_phase = True,
             delete_org_weight=True,
             immigrate_qparams = immigrate_qparams,
         )
