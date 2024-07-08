@@ -8,6 +8,26 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import mlperf_loadgen as lg
 from dataset import Dataset
+import yaml
+from transformers import AutoConfig
+import torch
+from torch.utils.data import DataLoader
+import json
+import quantization
+from quantization import calibration_utils
+import model_compressor
+from dataset import Dataset
+import joblib
+from generator_RNGD import (MLPerfSubmissionBeamSearch,
+                            expand_inputs_for_generation)
+from tqdm import tqdm
+from transformers import AutoTokenizer
+from transformers.generation.logits_process import \
+    MinNewTokensLengthLogitsProcessor
+from transformers.generation.stopping_criteria import MaxLengthCriteria
+from transformers.generation.utils import BeamSearchScorer
+from transformers.utils.fx import get_concrete_args
+import pickle
 
 
 
@@ -17,6 +37,21 @@ gen_kwargs = {
     "min_new_tokens": 30,
     "num_beams": int(os.environ.get("GPTJ_BEAM_SIZE", "4")), # only beam_size 4 is allowed for official submission
 }
+
+EARYLY_STOPPING = True
+PAD_TOKEN_ID = EOS_TOKEN_ID = 50256
+MAX_LENGTH = 2048
+MAX_NEW_TOKENS = 128
+MIN_NEW_TOKENS = 30
+NUM_BEAMS = 4
+LENGTH_PENALTY = 1.0
+NUM_RETURN_SEQUENCES = 1
+RETURN_DICT_IN_GENERATE = False
+LOGITS_PROCESSOR = MinNewTokensLengthLogitsProcessor
+STOPPING_CRITERIA = MaxLengthCriteria
+KV_DTYPE = torch.int8
+BUCKET_SIZE = 2048
+NUM_REAL_BATCH = 1
 
 
 class SUT_base():
@@ -160,6 +195,35 @@ class SUT_base():
             elif self.gen_source == 'QuantPreAllocatedGenerator':  
                 output_batch = self.model.generate(input_batch, **gen_kwargs)
             elif self.gen_source == 'MLPerf_submision_generator':
+                beam_scorer = BeamSearchScorer(
+                    batch_size=input_batch['input_ids'].shape[0],
+                    num_beams=NUM_BEAMS,
+                    device=input_batch['input_ids'].device,
+                    length_penalty=LENGTH_PENALTY,
+                    do_early_stopping=EARYLY_STOPPING,
+                    num_beam_hyps_to_keep=NUM_RETURN_SEQUENCES,
+                    max_length=MAX_LENGTH,
+                )
+                input_ids_tensor, input_masks_tensor_dict = expand_inputs_for_generation(
+                    input_ids=input_batch['input_ids'],
+                    expand_size=NUM_BEAMS,
+                    attention_mask= input_batch['attention_mask'],
+                )
+                input_masks_tensor = input_masks_tensor_dict["attention_mask"]
+
+                output_batch = submission_generator.generate(
+                    input_ids=input_ids_tensor,
+                    attention_mask=input_masks_tensor,
+                    beam_scorer=beam_scorer,
+                    logits_processor=logits_processor,
+                    stopping_criteria=stopping_criteria,
+                    max_length=MAX_LENGTH,
+                    pad_token_id=PAD_TOKEN_ID,
+                    eos_token_id=EOS_TOKEN_ID,
+                    return_dict_in_generate=RETURN_DICT_IN_GENERATE,
+                    kv_dtype=KV_DTYPE,
+                    bucket_size=BUCKET_SIZE,
+                )
                 output_batch = self.model.generate(**input_batch, **gen_kwargs)
             else:
                 raise NotImplementedError
