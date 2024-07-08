@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 import mlperf_loadgen as lg
 import torch
 from accelerate import disk_offload
-from backend_PyTorch import SUT_base as PyTorch_SUT_base
+#from backend_PyTorch import SUT_base as PyTorch_SUT_base
 from furiosa_llm_models.gptj.symbolic.mlperf_submission import \
     GPTJForCausalLM as upstream_GPTJForCausalLM
 from generator_RNGD import (MLPerfSubmissionBeamSearch,
