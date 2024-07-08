@@ -10,8 +10,10 @@ from transformers.generation import BeamScorer
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.stopping_criteria import StoppingCriteriaList
 from transformers.generation.utils import BeamSearchDecoderOnlyOutput
-from transformers.modeling_outputs import (CausalLMOutputWithCrossAttentions,
-                                           CausalLMOutputWithPast)
+from transformers.modeling_outputs import (
+    CausalLMOutputWithCrossAttentions,
+    CausalLMOutputWithPast,
+)
 
 SUPPORTED_GENERATION_RETURN_DICT_TYPES = (
     CausalLMOutputWithPast,

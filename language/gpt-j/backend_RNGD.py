@@ -1,3 +1,4 @@
+import argparse
 import array
 import os
 from typing import Dict, List, Tuple
@@ -5,7 +6,7 @@ from typing import Dict, List, Tuple
 import mlperf_loadgen as lg
 import torch
 from accelerate import disk_offload
-# from backend_PyTorch import SUT_base as PyTorch_SUT_base
+from backend_PyTorch import SUT_base as PyTorch_SUT_base
 from furiosa_llm_models.gptj.symbolic.mlperf_submission import \
     GPTJForCausalLM as upstream_GPTJForCausalLM
 from generator_RNGD import (MLPerfSubmissionBeamSearch,
@@ -39,11 +40,13 @@ RETURN_DICT_IN_GENERATE = False
 LOGITS_PROCESSOR = MinNewTokensLengthLogitsProcessor
 STOPPING_CRITERIA = MaxLengthCriteria
 KV_DTYPE = torch.float32
+QUANT_KV_DTYPE = torch.int8
 BUCKET_SIZE = 2048
 NUM_REAL_BATCH = 1
 
 
 # TODO: This code should be updated to the latest version of furiosa-llm-models
+# Maybe, v3.12.x
 class GPTJForCausalLM(upstream_GPTJForCausalLM):
     def get_input_names_and_concrete_args(
         self, model, prefill_phase=True
@@ -106,6 +109,8 @@ class GPTJForCausalLM(upstream_GPTJForCausalLM):
 
         return input_names, concrete_args
 
+# This is a hack to make the module name of the class to be the same as the original one
+GPTJForCausalLM.__module__ = "furiosa_llm_models.gptj.symbolic.mlperf_submission"
 
 # class SUT_base(PyTorch_SUT_base):
 #     def __init__(
