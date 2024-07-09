@@ -106,6 +106,9 @@ class SUT_base():
             elif model_source == 'mlperf_submission':
                 from furiosa_llm_models.gptj.symbolic.mlperf_submission import GPTJForCausalLM
                 self.gen_source = 'MLPerf_submision_generator'
+            elif model_source == 'mlperf_submission_rngd_backend':
+                from backend_RNGD import GPTJForCausalLM
+                self.gen_source = 'MLPerf_submision_generator'
 
             model_cls = GPTJForCausalLM
 
@@ -195,6 +198,11 @@ class SUT_base():
             elif self.gen_source == 'QuantPreAllocatedGenerator':  
                 output_batch = self.model.generate(input_batch, **gen_kwargs)
             elif self.gen_source == 'MLPerf_submision_generator':
+                logits_processor = LOGITS_PROCESSOR(
+                        input_batch['input_ids'].shape[-1], MIN_NEW_TOKENS, EOS_TOKEN_ID
+                    )
+                
+                stopping_criteria = None
                 beam_scorer = BeamSearchScorer(
                     batch_size=input_batch['input_ids'].shape[0],
                     num_beams=NUM_BEAMS,
@@ -211,7 +219,7 @@ class SUT_base():
                 )
                 input_masks_tensor = input_masks_tensor_dict["attention_mask"]
 
-                output_batch = submission_generator.generate(
+                output_batch = self.model.generate(
                     input_ids=input_ids_tensor,
                     attention_mask=input_masks_tensor,
                     beam_scorer=beam_scorer,
@@ -224,7 +232,6 @@ class SUT_base():
                     kv_dtype=KV_DTYPE,
                     bucket_size=BUCKET_SIZE,
                 )
-                output_batch = self.model.generate(**input_batch, **gen_kwargs)
             else:
                 raise NotImplementedError
 
