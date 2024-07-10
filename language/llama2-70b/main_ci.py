@@ -310,7 +310,7 @@ def test_model_equivalence():
                 )
 
             stopping_criteria = STOPPING_CRITERIA(
-                    input_ids_tensor.shape[-1]+MAX_NEW_TOKENS,
+                    MAX_LENGTH,
                     max_position_embeddings,
                 )
 
@@ -325,7 +325,6 @@ def test_model_equivalence():
                     return_dict_in_generate=RETURN_DICT_IN_GENERATE,
                     kv_dtype=QUANT_KV_DTYPE,
                     bucket_size=BUCKET_SIZE,
-                    max_new_tokens = MAX_NEW_TOKENS,
                 )
             # output = mlperf_model.generate(**test_data, max_length=seq_len+gen_kwargs["max_new_tokens"])
 

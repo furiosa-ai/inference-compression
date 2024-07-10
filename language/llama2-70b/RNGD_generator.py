@@ -21,7 +21,7 @@ MAX_PACKING_PER_ROW: int = 254
 MAX_BATCH_SIZE: int = 4
 BLOCK_SIZE: int = 1
 logger = logging.getLogger(__name__)
-MAX_NEW_TOKENS = 1024
+
 
 class MLPerfSubmissionGreedySearch:
     def __init__(
@@ -31,7 +31,6 @@ class MLPerfSubmissionGreedySearch:
         decode: Optional[GraphModule] = None,
         model_config: Optional[PretrainedConfig] = None,
         device_map: Optional[Dict[str, int]] = None,
-        max_new_tokens: int = MAX_NEW_TOKENS,
     ) -> None:
         if isinstance(model, PreTrainedModel):
             self.model = model
@@ -55,7 +54,7 @@ class MLPerfSubmissionGreedySearch:
         
         self.model_config = model_config if model_config is not None else self.prefill.config 
         self.device_map = device_map
-        self.max_new_tokens = MAX_NEW_TOKENS
+
 
     @torch.no_grad()
     def generate(
@@ -131,7 +130,7 @@ class MLPerfSubmissionGreedySearch:
         next_tokens = None
 
         # start generating new tokens
-        for i in range(self.max_new_tokens):
+        for i in range(max_length - prompt_len):
             if is_prefill:
                 (new_key_location, new_value_location) = (
                     self.prepare_prefill_input_metadata(attention_mask)
