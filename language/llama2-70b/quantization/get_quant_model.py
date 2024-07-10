@@ -18,6 +18,12 @@ gen_kwargs = {
     "do_sample": False
 }
 
+
+
+# valid only for LlamaForCausalLM
+TRANSFORMER_LAYER_MODULE = "model.layers"
+
+
 # To use pipeline model
 """ 
 def generate_pipeline_model(model, quant_config, run_model_offloading, args, pass_weight_load=False):
@@ -55,6 +61,11 @@ def get_quant_model(model, args, immigrate_qparams=False):
     model_type = type(model)
 
     if model_type == furiosa_llm_models.llama.symbolic.mlperf_submission.LlamaForCausalLM:
+        device_map = None
+        # Needs to place paged attention key value blocks on the same device as the transformer layers
+        if hasattr(model, "hf_device_map"):
+            device_map = {k.split(TRANSFORMER_LAYER_MODULE + ".")[1]: v for k, v in model.hf_device_map.items() if TRANSFORMER_LAYER_MODULE in k}
+
         
         prefill_model = model.trace_prefill()
         decode_model = model.trace_decode()
@@ -104,16 +115,20 @@ def get_quant_model(model, args, immigrate_qparams=False):
     )
 
     if model_type == furiosa_llm_models.llama.symbolic.mlperf_submission.LlamaForCausalLM:
-        from furiosa_llm_models.generators.symbolic.llama_multi_gpu_paged_attention_optimized_generator_mcp import PagedAttentionGenerator
-        kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16'
+        #from furiosa_llm_models.generators.symbolic.llama_multi_gpu_paged_attention_optimized_generator_mcp import PagedAttentionGenerator
+        from RNGD_generator import MLPerfSubmissionGreedySearch  
+        #kv_dtype = quant_config["kv_dtype"] if "kv_dtype" in quant_config else 'bf16'
 
-        generator = PagedAttentionGenerator(
-            prefill=prefill_quantized_model,
-            decode=decode_quantized_model,
-            kv_dtype=torch.int8 if kv_dtype == 'int8' else torch.bfloat16,
-            return_tensors=True,
-            bucket_size=2048,
-        )
+        # generator = PagedAttentionGenerator(
+        #     prefill=prefill_quantized_model,
+        #     decode=decode_quantized_model,
+        #     kv_dtype=torch.int8 if kv_dtype == 'int8' else torch.bfloat16,
+        #     return_tensors=True,
+        #     bucket_size=2048,
+        # )
+
+
+        generator = MLPerfSubmissionGreedySearch(model = {"prefill" : prefill_quantized_model, "decode": decode_quantized_model}, device_map = device_map)
 
         return generator
     else:

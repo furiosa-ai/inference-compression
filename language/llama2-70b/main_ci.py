@@ -11,7 +11,10 @@ from quantization.utils import get_kwargs, random_seed, set_optimization
 from quantization.get_quant_model import get_quant_model
 from quantization.calibrate import make_calib_dataloader, calibrate
 import pickle
-
+from transformers.generation.logits_process import \
+    MinNewTokensLengthLogitsProcessor
+from transformers.generation.stopping_criteria import MaxLengthCriteria
+from transformers import AutoTokenizer
 
 def check_logits(
     golden_model_file_path,
@@ -44,6 +47,18 @@ def check_logits(
 # Assume BLOCK_SIZE, NUM_BLOCKS, BUCKET_SIZE are fixed for now.
 BLOCK_SIZE = 1
 # bucket size would simply be a max value such as 2048 since we only provide one bucket
+EARLY_STOPPING = True
+PAD_TOKEN_ID = EOS_TOKEN_ID = 2
+MAX_LENGTH = 2048
+MAX_NEW_TOKENS = 1024
+MIN_NEW_TOKENS = 1
+NUM_BEAMS = 1
+DO_SAMPLE = False
+RETURN_DICT_IN_GENERATE = False
+LOGITS_PROCESSOR = MinNewTokensLengthLogitsProcessor
+STOPPING_CRITERIA = MaxLengthCriteria
+KV_DTYPE = torch.float32
+QUANT_KV_DTYPE = torch.int8
 BUCKET_SIZE = 2048
 
 gen_kwargs = {
@@ -237,7 +252,7 @@ def test_model_equivalence():
     # create mlperf model
     args.model_source = "mlperf_submission"
     model = load_pytorch_model(args.model_source, args.model_path, args.n_layers)
-    
+    max_position_embeddings = getattr(model, "max_position_embeddings", None)
     # create quant golden model and activate dump mode
     mlperf_path = "./mlperf_dump"
     mlperf_model = get_quant_model(model, args, immigrate_qparams=True)
@@ -259,11 +274,60 @@ def test_model_equivalence():
         dumping_before_rounding=True,
         dump_in_append_mode=True)
 
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_path,
+        model_max_length=1024,
+        padding_side="left",
+        use_fast=False,
+    )
+    tokenizer.pad_token = tokenizer.eos_token
     # generate
+
+    max_seq_len = 1024
+    input_ids_tensor = []
+    input_masks_tensor = []
+    input_len = []
+
     with torch.no_grad():
         for test_data in test_data_list:
-            seq_len = test_data['input_ids'].shape[1]
-            output = mlperf_model.generate(**test_data, max_length=seq_len+gen_kwargs["max_new_tokens"])
+
+            input_ids_tensor.append(pad(test_data['input_ids'],
+                                        (max_seq_len - test_data['input_ids'].shape[-1], 0, 0, 0),
+                                        value=tokenizer.pad_token_id))
+
+            input_masks_tensor.append(pad(test_data['attention_mask'],
+                                            (max_seq_len - test_data['attention_mask'].shape[-1], 0, 0, 0),
+                                            value=0))
+            input_len.append(len(test_data['input_ids']))
+
+            input_ids_tensor = torch.cat(input_ids_tensor)
+            input_masks_tensor = torch.cat(input_masks_tensor)
+
+
+        
+        logits_processor = LOGITS_PROCESSOR(
+                input_ids_tensor.shape[-1], MIN_NEW_TOKENS, EOS_TOKEN_ID
+            )
+
+        stopping_criteria = STOPPING_CRITERIA(
+                input_ids_tensor.shape[-1]+MAX_NEW_TOKENS,
+                max_position_embeddings,
+            )
+
+        output = mlperf_model.generate(
+                input_ids=input_ids_tensor,
+                attention_mask=input_masks_tensor,
+                logits_processor=logits_processor,
+                stopping_criteria=stopping_criteria,
+                max_length=MAX_LENGTH,
+                pad_token_id=PAD_TOKEN_ID,
+                eos_token_id=EOS_TOKEN_ID,
+                return_dict_in_generate=RETURN_DICT_IN_GENERATE,
+                kv_dtype=QUANT_KV_DTYPE,
+                bucket_size=BUCKET_SIZE,
+                max_new_tokens = MAX_NEW_TOKENS,
+            )
+            # output = mlperf_model.generate(**test_data, max_length=seq_len+gen_kwargs["max_new_tokens"])
 
     del mlperf_model
     del model

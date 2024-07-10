@@ -21,7 +21,7 @@ MAX_PACKING_PER_ROW: int = 254
 MAX_BATCH_SIZE: int = 4
 BLOCK_SIZE: int = 1
 logger = logging.getLogger(__name__)
-
+MAX_NEW_TOKENS = 1024
 
 class MLPerfSubmissionGreedySearch:
     def __init__(
@@ -31,6 +31,7 @@ class MLPerfSubmissionGreedySearch:
         decode: Optional[GraphModule] = None,
         model_config: Optional[PretrainedConfig] = None,
         device_map: Optional[Dict[str, int]] = None,
+        max_new_tokens: int = MAX_NEW_TOKENS,
     ) -> None:
         if isinstance(model, PreTrainedModel):
             self.model = model
@@ -51,8 +52,10 @@ class MLPerfSubmissionGreedySearch:
 
         if self.model is None:
             raise ValueError("model is not provided or valid.")
-        self.model_config = model_config
+        
+        self.model_config = model_config if model_config is not None else self.prefill.config 
         self.device_map = device_map
+        self.max_new_tokens = MAX_NEW_TOKENS
 
     @torch.no_grad()
     def generate(
@@ -128,7 +131,7 @@ class MLPerfSubmissionGreedySearch:
         next_tokens = None
 
         # start generating new tokens
-        for i in range(max_length - prompt_len):
+        for i in range(self.max_new_tokens):
             if is_prefill:
                 (new_key_location, new_value_location) = (
                     self.prepare_prefill_input_metadata(attention_mask)
@@ -251,8 +254,8 @@ class MLPerfSubmissionGreedySearch:
                 )
                 if unfinished_sequences.max() == 0:
                     break
-            if sequence_idx == 10:
-                break
+            # if sequence_idx == 10:
+            #     break
             if stopping_criteria(starting_input_ids, scores):
                 break
 
@@ -430,7 +433,9 @@ class MLPerfSubmissionGreedySearch:
             next_token_logits = logits[:, 0, :]  # for decode seq_len would just be 1
         next_tokens_scores = logits_processor(input_ids, next_token_logits)
         next_tokens = torch.argmax(next_tokens_scores, dim=-1)
-        next_tokens = next_tokens * unfinished_sequences + pad_token_id * (
+
+        
+        next_tokens = next_tokens.to(unfinished_sequences.device) * unfinished_sequences + pad_token_id * (
             1 - unfinished_sequences
         )
         return next_tokens
