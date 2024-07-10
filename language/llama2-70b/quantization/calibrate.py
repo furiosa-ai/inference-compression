@@ -6,7 +6,7 @@ import yaml
 from torch.utils.data import DataLoader
 from torch.nn.functional import pad
 import model_compressor
-from quantization.utils import get_kwargs, random_seed, set_optimization 
+from utils import get_kwargs, random_seed, set_optimization 
 
 # Assume BLOCK_SIZE, NUM_BLOCKS, BUCKET_SIZE are fixed for now.
 BLOCK_SIZE = 1
@@ -92,6 +92,12 @@ def make_calib_dataloader(model, model_source, data_path, batch_size, n_calib, m
     return DataLoader(data_list, batch_size=batch_size)
 
 
+def get_autoscale_calib_config(model, autoscale, smoothquant_alpha):
+    from autoscale import extract_kwargs 
+    autoscale_calib_cfg = extract_kwargs.get_autoscale_calib_cfg(model, autoscale=autoscale, smoothquant_alpha=smoothquant_alpha)
+    return autoscale_calib_cfg
+
+
 def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dataloader):
     if model_source == 'mlperf_submission':
         model = model.trace_prefill()
@@ -102,7 +108,6 @@ def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dat
             disable_check=True
             )
 
-
     model = model_compressor.create_quantsim_model(
         model,
         dataloader=calib_dataloader,
@@ -110,11 +115,16 @@ def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dat
         **get_kwargs(model_compressor.create_quantsim_model, qconfig),
     )
 
-    
+    if 'autoscale' in qconfig:
+        smoothquant_alpha = qconfig.get("smoothquant_alpha", 0.5)
+        autoscale_calib_kwargs = get_autoscale_calib_config(model, autoscale=qconfig["autoscale"], smoothquant_alpha=smoothquant_alpha)
+    else:
+        autoscale_calib_kwargs = None
     model_compressor.calibrate(
         model,
         calib_dataloader=calib_dataloader,
         **get_kwargs(model_compressor.calibrate, qconfig),
+        autoscale_calib_kwargs=autoscale_calib_kwargs,
     )
 
     model_compressor.save(
