@@ -99,6 +99,12 @@ def get_autoscale_calib_config(model, autoscale, smoothquant_alpha):
 
 
 def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dataloader):
+    if 'autoscale' in qconfig:
+        smoothquant_alpha = qconfig.get("smoothquant_alpha", 0.5)
+        autoscale_calib_kwargs = get_autoscale_calib_config(model, autoscale=qconfig["autoscale"], smoothquant_alpha=smoothquant_alpha)
+    else:
+        autoscale_calib_kwargs = None
+    
     if model_source == 'mlperf_submission':
         model = model.trace_prefill()
     else:
@@ -115,11 +121,6 @@ def calibrate(model, model_source, qconfig, qparam_path, qformat_path, calib_dat
         **get_kwargs(model_compressor.create_quantsim_model, qconfig),
     )
 
-    if 'autoscale' in qconfig:
-        smoothquant_alpha = qconfig.get("smoothquant_alpha", 0.5)
-        autoscale_calib_kwargs = get_autoscale_calib_config(model, autoscale=qconfig["autoscale"], smoothquant_alpha=smoothquant_alpha)
-    else:
-        autoscale_calib_kwargs = None
     model_compressor.calibrate(
         model,
         calib_dataloader=calib_dataloader,
