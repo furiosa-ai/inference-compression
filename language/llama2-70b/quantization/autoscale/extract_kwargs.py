@@ -60,6 +60,7 @@ def get_autoscale_calib_cfg(
     calib_cfg['unify_smooth_factor'] = False # unify_smooth_factor is implemented only for GPT-J at the moment.
     calib_cfg['module_name_to_replace_smooth_factor'] = 'fc_in'
     calib_cfg['module_name_for_smooth_factor'] = 'q_proj'
+    calib_cfg['nodes_excluded_from_auto_scale_calib'].extend(['gate_proj', 'up_proj'])
 
     return calib_cfg
 
